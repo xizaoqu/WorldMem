@@ -15,12 +15,15 @@
 </p>
 
 <p align="center">
-  <!-- <a href="https://arxiv.org/abs/2405.14864" target='_blank'>
+  <a href="https://arxiv.org/abs/2405.14864" target='_blank'>
     <img src="https://img.shields.io/badge/arXiv-2308.16911-blue?">
-  </a> -->
+  </a>
   <a href="https://xizaoqu.github.io/worldmem/" target='_blank'>
     <img src="https://img.shields.io/badge/Project-&#x1F680-blue">
   </a>
+<a href="https://huggingface.co/spaces/yslan/worldmem" target="_blank">
+  <img src="https://img.shields.io/badge/🤗 HuggingFace-Demo-orange" />
+</a>
 </p>
 
 
@@ -39,9 +42,9 @@ pip install -r requirements.txt
 
 ## TODO
 
-- [x] Release inference models and weight;
-- [] Release training pipeline on MineCraft;
-- [] Release training data on MineCraft;
+- [x] Release inference models and weights;
+- [ ] Release training pipeline on Minecraft;
+- [ ] Release training data on Minecraft;
 
 
 

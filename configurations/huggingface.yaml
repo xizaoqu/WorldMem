@@ -1,0 +1,58 @@
+n_tokens: 3
+pose_cond_dim: 5
+use_plucker: true
+focal_length: 0.35
+customized_validation: true
+condition_similar_length: 8
+log_video: true
+relative_embedding: true
+cond_only_on_qk: true
+add_pose_embed: false
+use_domain_adapter: false
+use_reference_attention: true
+add_frame_timestep_embedder: true
+is_interactive: true
+diffusion:
+  sampling_timesteps: 20
+  beta_schedule: sigmoid
+  objective: pred_v
+  use_fused_snr: True
+  cum_snr_decay: 0.96
+  clip_noise: 20.
+  ddim_sampling_eta: 0.0
+  stabilization_level: 15
+  schedule_fn_kwargs: {}
+  use_snr: False
+  use_cum_snr: False
+  snr_clip: 5.0
+  timesteps: 1000
+  # architecture
+  architecture:
+    network_size: 64
+    attn_heads: 4
+    attn_dim_head: 64
+    dim_mults: [1, 2, 4, 8]
+    resolution: ${dataset.resolution}
+    attn_resolutions: [16, 32, 64, 128]
+    use_init_temporal_attn: True
+    use_linear_attn: True
+    time_emb_type: rotary
+
+weight_decay: 2e-3
+warmup_steps: 10000
+optimizer_beta: [0.9, 0.99]
+action_cond_dim: 25
+n_frames: 8
+frame_skip: 1
+frame_stack: 1
+uncertainty_scale: 1
+guidance_scale: 0.0
+chunk_size: 1 # -1 for full trajectory diffusion, number to specify diffusion chunk size
+scheduling_matrix: autoregressive
+noise_level: random_all
+causal: True
+x_shape: [3, 360, 640]
+context_frames: 1
+diffusion_path: yslan/worldmem_checkpoints/diffusion_only.ckpt
+vae_path: yslan/worldmem_checkpoints/vae_only.ckpt
+pose_predictor_path: yslan/worldmem_checkpoints/pose_prediction_model_only.ckpt

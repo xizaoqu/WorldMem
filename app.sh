@@ -1,0 +1,50 @@
+wandb disabled
+# srun -p a6000_xgpan -w MICL-PanXGSvr2 --gres=gpu:1 --ntasks-per-node=1 --cpus-per-task=8 \
+export WANDB_API_KEY=a4f0741e80f509317597ad944a7292fabcb68bdf
+
+CHECKPOINT_PATH="checkpoints/diffusion_only.ckpt"
+
+python -m app +name=pumpkin \
+    algorithm=df_video_worldmemminecraft \
+    +checkpoint_path=$CHECKPOINT_PATH \
+    experiment.tasks=[interactive] \
+    dataset.validation_multiplier=1 \
+    dataset=video_minecraft \
+    +customized_load=true \
+    +dataset.n_frames_valid=100 \
+    +algorithm.n_tokens=8 \
+    +load_vae=false \
+    +load_t_to_r=false \
+    +zero_init_gate=false \
+    experiment.validation.batch_size=1 \
+    +algorithm.pose_cond_dim=5 \
+    +algorithm.condition_similar_length=8 \
+    +dataset.condition_similar_length=8 \
+    +algorithm.use_plucker=true \
+    +dataset.use_plucker=true \
+    +dataset.padding_pool=10 \
+    +dataset.focal_length=0.35 \
+    +algorithm.focal_length=0.35 \
+    +only_tune_refer=false \
+    +dataset.customized_validation=true \
+    +algorithm.customized_validation=true \
+    algorithm.context_frames=90 \
+    +algorithm.vis_gt=true \
+    +algorithm.relative_embedding=true \
+    dataset.save_dir=data/test_pumpkin  \
+    +algorithm.log_video=true \
+    experiment.training.data.num_workers=4 \
+    experiment.validation.data.num_workers=4 \
+    +dataset.angle_range=30 \
+    +dataset.pos_range=0.5 \
+    +algorithm.cond_only_on_qk=true \
+    +algorithm.add_pose_embed=false \
+    +algorithm.use_domain_adapter=false \
+    +algorithm.use_reference_attention=true \
+    +algorithm.add_frame_timestep_embedder=true \
+    +dataset.add_frame_timestep_embedder=true \
+    experiment.validation.limit_batch=1 \
+    algorithm.diffusion.sampling_timesteps=20 \
+    +algorithm.is_interactive=true \
+    +vae_path=checkpoints/vae_only.ckpt \
+    +pose_predictor_path=checkpoints/pose_prediction_model_only.ckpt

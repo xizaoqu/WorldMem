@@ -11,15 +11,6 @@ from einops import rearrange
 from .rotary_embedding_torch import RotaryEmbedding, apply_rotary_emb
 import numpy as np
 
-def create_attention_bias(f1, f2, device=None, dtype=torch.float32):
-    f = f1 + f2
-    mask = torch.zeros((f, f), dtype=dtype, device=device)
-    if f1 > 0:
-        mask[:f1, :f1] = float('-inf')
-    if f2 > 0:
-        mask[f1:, f1:] = float('-inf')
-    return mask
-
 class TemporalAxialAttention(nn.Module):
     def __init__(
         self,

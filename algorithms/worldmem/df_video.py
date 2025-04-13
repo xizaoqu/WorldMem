@@ -333,7 +333,6 @@ class WorldMemMinecraft(DiffusionForcingBase):
         Args:
             cfg (DictConfig): Configuration object.
         """
-        # self.metrics = cfg.metrics
         self.n_tokens = cfg.n_frames // cfg.frame_stack # number of max tokens for the model
         self.n_frames = cfg.n_frames
         if hasattr(cfg, "n_tokens"):
@@ -351,13 +350,6 @@ class WorldMemMinecraft(DiffusionForcingBase):
         self.focal_length = cfg.focal_length
         self.log_video = cfg.log_video
         self.self_consistency_eval = getattr(cfg, "self_consistency_eval", False)
-
-        self.is_interactive = cfg.get("is_interactive", False)
-        if self.is_interactive:
-            self_frames = None
-            self_poses = None
-            self_memory_c2w = None
-            self_frame_idx = None
 
         super().__init__(cfg)
             
@@ -911,10 +903,3 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
         return xs_pred.cpu().numpy(), self_frames.cpu().numpy(), self_actions.cpu().numpy(), \
             self_poses.cpu().numpy(), self_memory_c2w.cpu().numpy(), self_frame_idx.cpu().numpy()
-
-
-    def reset(self):
-        self_frames = None
-        self_poses = None
-        self_memory_c2w = None
-        self_frame_idx = None

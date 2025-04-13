@@ -21,56 +21,10 @@ import spaces
 from algorithms.worldmem import WorldMemMinecraft
 from huggingface_hub import hf_hub_download
 import tempfile
+import os
+import requests
 
 torch.set_float32_matmul_precision("high")
-
-ACTION_KEYS = [
-    "inventory",
-    "ESC",
-    "hotbar.1",
-    "hotbar.2",
-    "hotbar.3",
-    "hotbar.4",
-    "hotbar.5",
-    "hotbar.6",
-    "hotbar.7",
-    "hotbar.8",
-    "hotbar.9",
-    "forward",
-    "back",
-    "left",
-    "right",
-    "cameraY",
-    "cameraX",
-    "jump",
-    "sneak",
-    "sprint",
-    "swapHands",
-    "attack",
-    "use",
-    "pickItem",
-    "drop",
-]
-
-# Mapping of input keys to action names
-KEY_TO_ACTION = {
-    "Q": ("forward", 1),
-    "E": ("back", 1),    
-    "W": ("cameraY", -1),
-    "S": ("cameraY", 1),
-    "A": ("cameraX", -1),
-    "D": ("cameraX", 1),
-    "U": ("drop", 1),
-    "N": ("noop", 1),
-    "1": ("hotbar.1", 1),
-}
-
-example_images = [
-    ["1", "assets/ice_plains.png", "turn rightgo backward→look up→turn left→look down→turn right→go forward→turn left", 20, 3, 8],
-    ["2", "assets/place.png", "put item→go backward→put item→go backward→go around", 20, 3, 8],
-    ["3", "assets/rain_sunflower_plains.png", "turn right→look up→turn right→look down→turn left→go backward→turn left", 20, 3, 8],
-    ["4", "assets/desert.png", "turn 360 degree→turn right→go forward→turn left", 20, 3, 8],
-]
 
 def load_custom_checkpoint(algo, checkpoint_path):
     hf_ckpt = str(checkpoint_path).split('/')
@@ -81,6 +35,26 @@ def load_custom_checkpoint(algo, checkpoint_path):
     ckpt = torch.load(model_path, map_location=torch.device('cpu'))
     algo.load_state_dict(ckpt['state_dict'], strict=False)
 
+def download_assets_if_needed():
+    ASSETS_URL_BASE = "https://huggingface.co/spaces/yslan/worldmem/resolve/main/assets/examples"
+    ASSETS_DIR = "assets/examples"
+    ASSETS = ['case1.npz', 'case2.npz', 'case3.npz', 'case4.npz']
+
+    if not os.path.exists(ASSETS_DIR):
+        os.makedirs(ASSETS_DIR)
+    
+    # Download assets if they don't exist (total 4 files)
+    for filename in ASSETS:
+        filepath = os.path.join(ASSETS_DIR, filename)
+        if not os.path.exists(filepath):
+            print(f"Downloading {filename}...")
+            url = f"{ASSETS_URL_BASE}/{filename}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                with open(filepath, "wb") as f:
+                    f.write(response.content)
+            else:
+                print(f"Failed to download {filename}: {response.status_code}")
 
 def parse_input_to_tensor(input_str):
     """
@@ -136,6 +110,56 @@ def enable_amp(model, precision="16-mixed"):
 
     model.forward = amp_forward
     return model
+
+download_assets_if_needed()
+
+ACTION_KEYS = [
+    "inventory",
+    "ESC",
+    "hotbar.1",
+    "hotbar.2",
+    "hotbar.3",
+    "hotbar.4",
+    "hotbar.5",
+    "hotbar.6",
+    "hotbar.7",
+    "hotbar.8",
+    "hotbar.9",
+    "forward",
+    "back",
+    "left",
+    "right",
+    "cameraY",
+    "cameraX",
+    "jump",
+    "sneak",
+    "sprint",
+    "swapHands",
+    "attack",
+    "use",
+    "pickItem",
+    "drop",
+]
+
+# Mapping of input keys to action names
+KEY_TO_ACTION = {
+    "Q": ("forward", 1),
+    "E": ("back", 1),    
+    "W": ("cameraY", -1),
+    "S": ("cameraY", 1),
+    "A": ("cameraX", -1),
+    "D": ("cameraX", 1),
+    "U": ("drop", 1),
+    "N": ("noop", 1),
+    "1": ("hotbar.1", 1),
+}
+
+example_images = [
+    ["1", "assets/ice_plains.png", "turn rightgo backward→look up→turn left→look down→turn right→go forward→turn left", 20, 3, 8],
+    ["2", "assets/place.png", "put item→go backward→put item→go backward→go around", 20, 3, 8],
+    ["3", "assets/rain_sunflower_plains.png", "turn right→look up→turn right→look down→turn left→go backward→turn left", 20, 3, 8],
+    ["4", "assets/desert.png", "turn 360 degree→turn right→go forward→turn left", 20, 3, 8],
+]
 
 memory_frames = []
 input_history = ""

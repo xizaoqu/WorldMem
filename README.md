@@ -65,5 +65,5 @@ url={https://openreview.net/forum?id=2z1HT5lw5M}
 
 ## 👏 Acknowledgements
 - [Diffusion Forcing](https://github.com/buoyancy99/diffusion-forcing): Diffusion Forcing provides flexible training and inference strategies for our methods.
-- [Minedojo](https://github.com/MineDojo/MineDojo): We collect our minecraft dataset from Minedojo.
+- [Minedojo](https://github.com/MineDojo/MineDojo): We collect our Minecraft dataset from Minedojo.
 - [Open-oasis](https://github.com/etched-ai/open-oasis): Our model architecture is based on Open-oasis. We also use pretrained VAE and DiT weight from it.

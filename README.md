@@ -2,8 +2,8 @@
 <br>
 <p align="center">
 <h1 align="center"><strong>WORLDMEM: Long-term Consistent World Generation with Memory</strong></h1>
-  <p align="center"><span><a href="https://natanielruiz.github.io/"></a></span>
-              <a href="https://github.com/xizaoqu">Zeqi Xiao<sup>1</sup></a>
+  <p align="center"><span><a href=""></a></span>
+              <a href="https://xizaoqu.github.io">Zeqi Xiao<sup>1</sup></a>
               <a href="https://nirvanalan.github.io/">Yushi Lan<sup>1</sup></a>
               <a href="https://zhouyifan.net/about/">Yifan Zhou<sup>1</sup></a>
               <a href="https://vicky0522.github.io/Wenqi-Ouyang/">Wenqi Ouyang<sup>1</sup></a>
@@ -15,9 +15,9 @@
 </p>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/2411.19324" target='_blank'>
+  <!-- <a href="https://arxiv.org/abs/2411.19324" target='_blank'>
     <img src="https://img.shields.io/badge/arXiv-2411.19324-blue?">
-  </a>
+  </a> -->
   <a href="https://xizaoqu.github.io/worldmem/" target='_blank'>
     <img src="https://img.shields.io/badge/Project-&#x1F680-blue">
   </a>

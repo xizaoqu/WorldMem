@@ -15,8 +15,8 @@
 </p>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/2405.14864" target='_blank'>
-    <img src="https://img.shields.io/badge/arXiv-2308.16911-blue?">
+  <a href="https://arxiv.org/abs/2411.19324" target='_blank'>
+    <img src="https://img.shields.io/badge/arXiv-2411.19324-blue?">
   </a>
   <a href="https://xizaoqu.github.io/worldmem/" target='_blank'>
     <img src="https://img.shields.io/badge/Project-&#x1F680-blue">
@@ -38,7 +38,9 @@ pip install -r requirements.txt
 
 ## Quick start
 
-
+```
+python app.py
+```
 
 ## TODO
 
@@ -52,15 +54,8 @@ pip install -r requirements.txt
 
 If you find our work helpful, please cite:
 
-```bibtex
-@inproceedings{
-xiao2025trajectory,
-title={Trajectory attention for fine-grained video motion control},
-author={Zeqi Xiao and Wenqi Ouyang and Yifan Zhou and Shuai Yang and Lei Yang and Jianlou Si and Xingang Pan},
-booktitle={The Thirteenth International Conference on Learning Representations},
-year={2025},
-url={https://openreview.net/forum?id=2z1HT5lw5M}
-}
+```
+TBD
 ```
 
 ## 👏 Acknowledgements

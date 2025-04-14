@@ -380,7 +380,7 @@ h1 {
 with gr.Blocks(css=css) as demo:
     gr.Markdown(
         """
-        # WORLDMEM: Long-term Consistent World Generation with Memory
+        # WORLDMEM: Long-term Consistent World Simulation with Memory
         """
         )
 

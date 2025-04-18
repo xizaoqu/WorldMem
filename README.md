@@ -19,9 +19,9 @@
 </p>
 
 <p align="center">
-  <!-- <a href="https://arxiv.org/abs/2411.19324" target='_blank'>
-    <img src="https://img.shields.io/badge/arXiv-2411.19324-blue?">
-  </a> -->
+  <a href="https://arxiv.org/abs/2504.12369" target='_blank'>
+    <img src="https://img.shields.io/badge/arXiv-2504.12369-blue?">
+  </a>
   <a href="https://xizaoqu.github.io/worldmem/" target='_blank'>
     <img src="https://img.shields.io/badge/Project-&#x1F680-blue">
   </a>

@@ -61,7 +61,15 @@ python app.py
 If you find our work helpful, please cite:
 
 ```
-TBD
+@misc{xiao2025worldmemlongtermconsistentworld,
+      title={WORLDMEM: Long-term Consistent World Simulation with Memory}, 
+      author={Zeqi Xiao and Yushi Lan and Yifan Zhou and Wenqi Ouyang and Shuai Yang and Yanhong Zeng and Xingang Pan},
+      year={2025},
+      eprint={2504.12369},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2504.12369}, 
+}
 ```
 
 ## 👏 Acknowledgements

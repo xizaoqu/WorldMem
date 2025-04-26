@@ -27,13 +27,19 @@ import requests
 torch.set_float32_matmul_precision("high")
 
 def load_custom_checkpoint(algo, checkpoint_path):
-    hf_ckpt = str(checkpoint_path).split('/')
-    repo_id = '/'.join(hf_ckpt[:2])
-    file_name = '/'.join(hf_ckpt[2:])
-    model_path = hf_hub_download(repo_id=repo_id, 
-                        filename=file_name)
-    ckpt = torch.load(model_path, map_location=torch.device('cpu'))
-    algo.load_state_dict(ckpt['state_dict'], strict=False)
+    try:
+        hf_ckpt = str(checkpoint_path).split('/')
+        repo_id = '/'.join(hf_ckpt[:2])
+        file_name = '/'.join(hf_ckpt[2:])
+        model_path = hf_hub_download(repo_id=repo_id, 
+                            filename=file_name)
+        ckpt = torch.load(model_path, map_location=torch.device('cpu'))
+        algo.load_state_dict(ckpt['state_dict'], strict=False)
+        print("Load: ", model_path)
+    except:
+        ckpt = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+        algo.load_state_dict(ckpt['state_dict'], strict=False)      
+        print("Load: ", checkpoint_path)  
 
 def download_assets_if_needed():
     ASSETS_URL_BASE = "https://huggingface.co/spaces/yslan/worldmem/resolve/main/assets/examples"

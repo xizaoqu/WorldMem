@@ -53,6 +53,6 @@ noise_level: random_all
 causal: True
 x_shape: [3, 360, 640]
 context_frames: 1
-diffusion_path: yslan/worldmem_checkpoints/diffusion_only.ckpt
+diffusion_path: /mnt/xiaozeqi/worldmem_github/diffusion_only_2025-04-04_4-56-27_epoch1step560000.ckpt
 vae_path: yslan/worldmem_checkpoints/vae_only.ckpt
 pose_predictor_path: yslan/worldmem_checkpoints/pose_prediction_model_only.ckpt

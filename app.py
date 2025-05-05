@@ -243,6 +243,12 @@ def set_memory_length(memory_length, sampling_memory_length_state):
     print("set memory length to", worldmem.condition_similar_length)
     return sampling_memory_length_state
 
+def set_next_frame_length(next_frame_length, sampling_next_frame_length_state):
+    worldmem.next_frame_length = next_frame_length
+    sampling_next_frame_length_state = next_frame_length
+    print("set next frame length to", worldmem.next_frame_length)
+    return sampling_next_frame_length_state
+
 def generate(keys, input_history, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx):
     input_actions = parse_input_to_tensor(keys)
 
@@ -321,7 +327,8 @@ def reset(selected_image):
                                 self_actions=self_actions,
                                 self_poses=self_poses,
                                 self_memory_c2w=self_memory_c2w,
-                                self_frame_idx=self_frame_idx)
+                                self_frame_idx=self_frame_idx,
+                                )
 
     return input_history, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx
 
@@ -329,7 +336,7 @@ def on_image_click(selected_image):
     input_history, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx = reset(selected_image)
     return input_history, selected_image, selected_image, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx
 
-def set_memory(examples_case, image_display, log_output, slider_denoising_step,  slider_context_length, slider_memory_length):
+def set_memory(examples_case):
     if examples_case == '1':
         data_bundle = np.load("assets/examples/case1.npz")
         input_history = data_bundle['input_history'].item()
@@ -511,11 +518,16 @@ with gr.Blocks(css=css) as demo:
                 label="Memory Length",
                 info="How many previous frames in memory window."
             )
-
+            slider_next_frame_length = gr.Slider(
+                minimum=1, maximum=5, value=worldmem.next_frame_length, step=1,
+                label="Next Frame Length",
+                info="How many next frames to generate at once."
+            )
     
     sampling_timesteps_state = gr.State(worldmem.sampling_timesteps)
     sampling_context_length_state = gr.State(worldmem.n_tokens)
     sampling_memory_length_state = gr.State(worldmem.condition_similar_length)
+    sampling_next_frame_length_state = gr.State(worldmem.next_frame_length)
 
     memory_frames = gr.State(load_image_as_tensor(selected_image.value)[None].numpy())
     self_frames = gr.State()
@@ -545,11 +557,16 @@ with gr.Blocks(css=css) as demo:
 
     example_case.change(
         fn=set_memory,
-        inputs=[example_case, image_output, log_output, slider_denoising_step, slider_context_length, slider_memory_length],
+        inputs=[example_case],
         outputs=[log_output, image_display, video_display, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx]
     )
 
-    submit_button.click(generate, inputs=[input_box, log_output, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx], outputs=[image_display, video_display, log_output, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx])
+    submit_button.click(generate, inputs=[input_box, log_output, memory_frames, 
+                                          self_frames, self_actions, self_poses, 
+                                          self_memory_c2w, self_frame_idx], 
+                                          outputs=[image_display, video_display, log_output, 
+                                                                                                                                                                  memory_frames, self_frames, self_actions, self_poses, 
+                                                                                                                                                                  self_memory_c2w, self_frame_idx])
     reset_btn.click(reset, inputs=[selected_image], outputs=[log_output, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx])
     image_display_1.select(lambda: on_image_click(SUNFLOWERS_IMAGE), outputs=[log_output, selected_image, image_display, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx])
     image_display_2.select(lambda: on_image_click(DESERT_IMAGE), outputs=[log_output, selected_image, image_display, memory_frames, self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx])
@@ -561,5 +578,6 @@ with gr.Blocks(css=css) as demo:
     slider_denoising_step.change(fn=set_denoising_steps, inputs=[slider_denoising_step, sampling_timesteps_state], outputs=sampling_timesteps_state)
     slider_context_length.change(fn=set_context_length, inputs=[slider_context_length, sampling_context_length_state], outputs=sampling_context_length_state)
     slider_memory_length.change(fn=set_memory_length, inputs=[slider_memory_length, sampling_memory_length_state], outputs=sampling_memory_length_state)
+    slider_next_frame_length.change(fn=set_next_frame_length, inputs=[slider_next_frame_length, sampling_next_frame_length_state], outputs=sampling_next_frame_length_state)
 
 demo.launch()

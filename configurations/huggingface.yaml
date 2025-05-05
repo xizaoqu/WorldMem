@@ -48,11 +48,12 @@ frame_stack: 1
 uncertainty_scale: 1
 guidance_scale: 0.0
 chunk_size: 1 # -1 for full trajectory diffusion, number to specify diffusion chunk size
-scheduling_matrix: autoregressive
+scheduling_matrix: full_sequence
 noise_level: random_all
 causal: True
 x_shape: [3, 360, 640]
 context_frames: 1
-diffusion_path: /mnt/xiaozeqi/worldmem_github/diffusion_only_2025-04-04_4-56-27_epoch1step560000.ckpt
+diffusion_path: /mnt/xiaozeqi/worldmem_github/diffusion_only_2025-04-06-16-24-11_epoch1step720000.ckpt
 vae_path: yslan/worldmem_checkpoints/vae_only.ckpt
 pose_predictor_path: yslan/worldmem_checkpoints/pose_prediction_model_only.ckpt
+next_frame_length: 1

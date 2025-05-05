@@ -350,6 +350,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
         self.focal_length = cfg.focal_length
         self.log_video = cfg.log_video
         self.self_consistency_eval = getattr(cfg, "self_consistency_eval", False)
+        self.next_frame_length = cfg.next_frame_length
 
         super().__init__(cfg)
             
@@ -576,7 +577,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
         x = rearrange(x, "(t b) c h w-> t b c h w", t=total_frames)
         return x
 
-    def _generate_condition_indices(self, curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx):
+    def _generate_condition_indices(self, curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx, horizon):
         """
         Generate indices for condition similarity based on the current frame and pose conditions.
         """
@@ -592,17 +593,26 @@ class WorldMemMinecraft(DiffusionForcingBase):
             points += pose_conditions[curr_frame, :, :3][None]
             fov_half_h = torch.tensor(105 / 2, device=pose_conditions.device)
             fov_half_v = torch.tensor(75 / 2, device=pose_conditions.device)
-            in_fov1 = is_inside_fov_3d_hv(
-                points, pose_conditions[curr_frame, :, :3],
-                pose_conditions[curr_frame, :, -2], pose_conditions[curr_frame, :, -1],
-                fov_half_h, fov_half_v
-            )
+
+            # in_fov1 = is_inside_fov_3d_hv(
+            #     points, pose_conditions[curr_frame, :, :3],
+            #     pose_conditions[curr_frame, :, -2], pose_conditions[curr_frame, :, -1],
+            #     fov_half_h, fov_half_v
+            # )
+
+            in_fov1 = torch.stack([
+                is_inside_fov_3d_hv(points, pc[:, :3], pc[:, -2], pc[:, -1], fov_half_h, fov_half_v)
+                for pc in pose_conditions[curr_frame:curr_frame+horizon]
+            ])
+
+            in_fov1 = torch.sum(in_fov1, 0) > 0
 
             # Compute overlap ratios and select indices
             in_fov_list = torch.stack([
                 is_inside_fov_3d_hv(points, pc[:, :3], pc[:, -2], pc[:, -1], fov_half_h, fov_half_v)
                 for pc in pose_conditions[:curr_frame]
             ])
+
             random_idx = []
             for _ in range(condition_similar_length):
                 overlap_ratio = ((in_fov1.bool() & in_fov_list).sum(1)) / in_fov1.sum()
@@ -806,8 +816,8 @@ class WorldMemMinecraft(DiffusionForcingBase):
             new_actions = new_actions.to(device)
 
         curr_frame = 0
-        horizon = 1
         batch_size = 1
+        horizon = self.next_frame_length
         n_frames = curr_frame + horizon
         # context
         n_context_frames = len(self_frames)
@@ -816,24 +826,47 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
         pbar = tqdm(total=n_frames, initial=curr_frame, desc="Sampling")
 
-
-        for ai in range(len(new_actions)):
-
-            last_frame = xs_pred[-1].clone()
-            curr_actions = new_actions[ai]
-            last_pose_condition = self_poses[-1].clone()
+        new_pose_condition_list = []
+        last_frame = xs_pred[-1].clone()
+        last_pose_condition = self_poses[-1].clone()
+        curr_actions = new_actions.clone()
+        for hi in range(len(new_actions)):
             last_pose_condition[:,3:] = last_pose_condition[:,3:] // 15
-            new_pose_condition_offset = self.pose_prediction_model(last_frame.to(device), curr_actions[None], last_pose_condition)
-            
+            new_pose_condition_offset = self.pose_prediction_model(last_frame.to(device), curr_actions[None, hi], last_pose_condition)
             new_pose_condition_offset[:,3:] = torch.round(new_pose_condition_offset[:,3:])
             new_pose_condition = last_pose_condition + new_pose_condition_offset
             new_pose_condition[:,3:] = new_pose_condition[:,3:] * 15
             new_pose_condition[:,3:] %= 360
-            self_actions = torch.cat([self_actions, curr_actions[None, None]])
-            self_poses = torch.cat([self_poses, new_pose_condition[None]])
+            last_pose_condition = new_pose_condition.clone()
+            new_pose_condition_list.append(new_pose_condition[None])
+        new_pose_condition_list = torch.cat(new_pose_condition_list, 0)
+        
+        ai = 0
+        while ai < len(new_actions):
+            next_horizon = min(horizon, len(new_actions) - ai)
+            last_frame = xs_pred[-1].clone()
+            curr_actions = new_actions[ai:ai+next_horizon].clone()
+
+            # last_pose_condition = self_poses[-1].clone()
+            # new_pose_condition_list = []
+            # for hi in range(next_horizon):
+            #     last_pose_condition[:,3:] = last_pose_condition[:,3:] // 15
+            #     new_pose_condition_offset = self.pose_prediction_model(last_frame.to(device), curr_actions[None, hi], last_pose_condition)
+            #     new_pose_condition_offset[:,3:] = torch.round(new_pose_condition_offset[:,3:])
+            #     new_pose_condition = last_pose_condition + new_pose_condition_offset
+            #     new_pose_condition[:,3:] = new_pose_condition[:,3:] * 15
+            #     new_pose_condition[:,3:] %= 360
+            #     last_pose_condition = new_pose_condition.clone()
+            #     new_pose_condition_list.append(new_pose_condition[None])
+            # new_pose_condition = torch.cat(new_pose_condition_list, 0)
+            new_pose_condition = new_pose_condition_list[ai:ai+next_horizon].clone()
+
             new_c2w_mat = euler_to_camera_to_world_matrix(new_pose_condition)
-            self_memory_c2w = torch.cat([self_memory_c2w, new_c2w_mat[None]])
-            self_frame_idx = torch.cat([self_frame_idx, torch.tensor([[self_frame_idx[-1,0]+1]]).to(device)])
+            self_poses = torch.cat([self_poses, new_pose_condition])
+            self_actions = torch.cat([self_actions, curr_actions[:, None]])
+            self_memory_c2w = torch.cat([self_memory_c2w, new_c2w_mat])
+            new_indices = self_frame_idx[-1,0] + torch.arange(next_horizon, device=self_frame_idx.device)
+            self_frame_idx = torch.cat([self_frame_idx, new_indices[:, None]])
 
             conditions = self_actions.clone()
             pose_conditions = self_poses.clone()
@@ -841,26 +874,26 @@ class WorldMemMinecraft(DiffusionForcingBase):
             frame_idx = self_frame_idx.clone()
 
             # generation on frame
-            scheduling_matrix = self._generate_scheduling_matrix(horizon)
-            chunk = torch.randn((horizon, batch_size, *xs_pred.shape[2:])).to(xs_pred.device)
+            scheduling_matrix = self._generate_scheduling_matrix(next_horizon)
+            chunk = torch.randn((next_horizon, batch_size, *xs_pred.shape[2:])).to(xs_pred.device)
             chunk = torch.clamp(chunk, -self.clip_noise, self.clip_noise)
 
             xs_pred = torch.cat([xs_pred, chunk], 0)
 
             # sliding window: only input the last n_tokens frames
-            start_frame = max(0, curr_frame + horizon - self.n_tokens)
+            start_frame = max(0, curr_frame - self.n_tokens)
 
             pbar.set_postfix(
                 {
                     "start": start_frame,
-                    "end": curr_frame + horizon,
+                    "end": curr_frame + next_horizon,
                 }
             )
 
             # Handle condition similarity logic
             if condition_similar_length:
                 random_idx = self._generate_condition_indices(
-                    curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx
+                    curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx, next_horizon
                 )
                 
                 # random_idx = np.unique(random_idx)[:, None]
@@ -869,9 +902,12 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
             # Prepare input conditions and pose conditions
             input_condition, input_pose_condition, frame_idx_list = self._prepare_conditions(
-                start_frame, curr_frame, horizon, conditions, pose_conditions, c2w_mat, frame_idx, random_idx,
+                start_frame, curr_frame, next_horizon, conditions, pose_conditions, c2w_mat, frame_idx, random_idx,
                 image_width=first_frame.shape[-1], image_height=first_frame.shape[-2]
             )
+
+            from time import time
+            start_time = time()
 
             # Perform sampling for each step in the scheduling matrix
             for m in range(scheduling_matrix.shape[0] - 1):
@@ -891,12 +927,14 @@ class WorldMemMinecraft(DiffusionForcingBase):
                     frame_idx=frame_idx_list
                 ).cpu()
 
-
+            end_time = time()
+            print(f"Time taken for {next_horizon} frames: {end_time - start_time:.2f} seconds")
             if condition_similar_length:
                 xs_pred = xs_pred[:-condition_similar_length]
 
-            curr_frame += horizon
-            pbar.update(horizon)
+            curr_frame += next_horizon
+            pbar.update(next_horizon)
+            ai += next_horizon
 
         self_frames = torch.cat([self_frames, xs_pred[n_context_frames:]])
         xs_pred = self.decode(xs_pred[n_context_frames:].to(device)).cpu()

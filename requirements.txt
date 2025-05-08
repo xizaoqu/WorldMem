@@ -24,3 +24,5 @@ h5py
 rotary_embedding_torch
 diffusers
 timm
+gradio
+spaces

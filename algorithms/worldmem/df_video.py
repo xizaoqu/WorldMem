@@ -858,7 +858,6 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
             memory_frame_idx = torch.cat([memory_frame_idx, new_indices[:, None]])
 
-            print(memory_frame_idx)
             conditions = memory_actions.clone()
             pose_conditions = memory_poses.clone()
             c2w_mat = memory_c2w .clone()

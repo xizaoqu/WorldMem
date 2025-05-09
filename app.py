@@ -512,7 +512,7 @@ with gr.Blocks(css=css) as demo:
             slider_memory_length = gr.Slider(
                 minimum=4, maximum=16, value=worldmem.condition_similar_length, step=1,
                 label="Memory Length",
-                info="How many previous frames in memory window."
+                info="How many previous frames in memory window. (Recommended: 1, multi-frame generation is not stable yet)"
             )
             slider_next_frame_length = gr.Slider(
                 minimum=1, maximum=5, value=worldmem.next_frame_length, step=1,

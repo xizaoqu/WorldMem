@@ -336,39 +336,39 @@ def set_memory(examples_case):
     if examples_case == '1':
         data_bundle = np.load("assets/examples/case1.npz")
         input_history = data_bundle['input_history'].item()
-        video_frames = data_bundle['video_frames']
-        memory_latent_frames = data_bundle['memory_latent_frames']
-        memory_actions = data_bundle['memory_actions']
-        memory_poses = data_bundle['memory_poses']
-        memory_c2w = data_bundle['memory_c2w']
-        memory_frame_idx = data_bundle['memory_frame_idx']
+        video_frames = data_bundle['memory_frames']
+        memory_latent_frames = data_bundle['self_frames']
+        memory_actions = data_bundle['self_actions']
+        memory_poses = data_bundle['self_poses']
+        memory_c2w = data_bundle['self_memory_c2w']
+        memory_frame_idx = data_bundle['self_frame_idx']
     elif examples_case == '2':
         data_bundle = np.load("assets/examples/case2.npz")
         input_history = data_bundle['input_history'].item()
-        video_frames = data_bundle['video_frames']
-        memory_latent_frames = data_bundle['memory_latent_frames']
-        memory_actions = data_bundle['memory_actions']
-        memory_poses = data_bundle['memory_poses']
-        memory_c2w = data_bundle['memory_c2w']
-        memory_frame_idx = data_bundle['memory_frame_idx']
+        video_frames = data_bundle['memory_frames']
+        memory_latent_frames = data_bundle['self_frames']
+        memory_actions = data_bundle['self_actions']
+        memory_poses = data_bundle['self_poses']
+        memory_c2w = data_bundle['self_memory_c2w']
+        memory_frame_idx = data_bundle['self_frame_idx']
     elif examples_case == '3':
         data_bundle = np.load("assets/examples/case3.npz")
         input_history = data_bundle['input_history'].item()
-        video_frames = data_bundle['video_frames']
-        memory_latent_frames = data_bundle['memory_latent_frames']
-        memory_actions = data_bundle['memory_actions']
-        memory_poses = data_bundle['memory_poses']
-        memory_c2w = data_bundle['memory_c2w']
-        memory_frame_idx = data_bundle['memory_frame_idx']
+        video_frames = data_bundle['memory_frames']
+        memory_latent_frames = data_bundle['self_frames']
+        memory_actions = data_bundle['self_actions']
+        memory_poses = data_bundle['self_poses']
+        memory_c2w = data_bundle['self_memory_c2w']
+        memory_frame_idx = data_bundle['self_frame_idx']
     elif examples_case == '4':
         data_bundle = np.load("assets/examples/case4.npz")
         input_history = data_bundle['input_history'].item()
-        video_frames = data_bundle['video_frames']
-        memory_latent_frames = data_bundle['memory_latent_frames']
-        memory_actions = data_bundle['memory_actions']
-        memory_poses = data_bundle['memory_poses']
-        memory_c2w = data_bundle['memory_c2w']
-        memory_frame_idx = data_bundle['memory_frame_idx']
+        video_frames = data_bundle['memory_frames']
+        memory_latent_frames = data_bundle['self_frames']
+        memory_actions = data_bundle['self_actions']
+        memory_poses = data_bundle['self_poses']
+        memory_c2w = data_bundle['self_memory_c2w']
+        memory_frame_idx = data_bundle['self_frame_idx']
 
     out_video = video_frames.transpose(0,2,3,1)
     out_video = np.clip(out_video, a_min=0.0, a_max=1.0)

@@ -181,15 +181,11 @@ device = torch.device('cuda')
 
 def save_video(frames, path="output.mp4", fps=10):
     h, w, _ = frames[0].shape
-    out = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'XVID'), fps, (w, h))
+    out = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
     for frame in frames:
         out.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
     out.release()
 
-    ffmpeg_cmd = [
-        "ffmpeg", "-y", "-i", path, "-c:v", "libx264", "-crf", "23", "-preset", "medium", path
-    ]
-    subprocess.run(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return path
 
 cfg = OmegaConf.load("configurations/huggingface.yaml")

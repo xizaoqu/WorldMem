@@ -792,28 +792,28 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
     @torch.no_grad()
     def interactive(self, first_frame, new_actions, first_pose, device,
-                    self_frames, self_actions, self_poses, self_memory_c2w, self_frame_idx):
+                    memory_latent_frames, memory_actions, memory_poses, memory_c2w, memory_frame_idx):
     
         condition_similar_length = self.condition_similar_length
 
-        if self_frames is None:
+        if memory_latent_frames is None:
             first_frame = torch.from_numpy(first_frame)
             new_actions = torch.from_numpy(new_actions)
             first_pose = torch.from_numpy(first_pose)
             first_frame_encode = self.encode(first_frame[None, None].to(device))
-            self_frames = first_frame_encode.cpu()
-            self_actions = new_actions[None, None].to(device)
-            self_poses = first_pose[None, None].to(device)
+            memory_latent_frames = first_frame_encode.cpu()
+            memory_actions = new_actions[None, None].to(device)
+            memory_poses = first_pose[None, None].to(device)
             new_c2w_mat = euler_to_camera_to_world_matrix(first_pose)
-            self_memory_c2w = new_c2w_mat[None, None].to(device)
-            self_frame_idx = torch.tensor([[0]]).to(device)
-            return first_frame.cpu().numpy(), self_frames.cpu().numpy(), self_actions.cpu().numpy(), self_poses.cpu().numpy(), self_memory_c2w.cpu().numpy(), self_frame_idx.cpu().numpy()
+            memory_c2w = new_c2w_mat[None, None].to(device)
+            memory_frame_idx = torch.tensor([[0]]).to(device)
+            return first_frame.cpu().numpy(), memory_latent_frames.cpu().numpy(), memory_actions.cpu().numpy(), memory_poses.cpu().numpy(), memory_c2w.cpu().numpy(), memory_frame_idx.cpu().numpy()
         else:
-            self_frames = torch.from_numpy(self_frames)
-            self_actions = torch.from_numpy(self_actions).to(device)
-            self_poses = torch.from_numpy(self_poses).to(device)
-            self_memory_c2w = torch.from_numpy(self_memory_c2w).to(device)
-            self_frame_idx = torch.from_numpy(self_frame_idx).to(device)
+            memory_latent_frames = torch.from_numpy(memory_latent_frames)
+            memory_actions = torch.from_numpy(memory_actions).to(device)
+            memory_poses = torch.from_numpy(memory_poses).to(device)
+            memory_c2w = torch.from_numpy(memory_c2w).to(device)
+            memory_frame_idx = torch.from_numpy(memory_frame_idx).to(device)
             new_actions = new_actions.to(device)
 
         curr_frame = 0
@@ -821,15 +821,15 @@ class WorldMemMinecraft(DiffusionForcingBase):
         horizon = self.next_frame_length
         n_frames = curr_frame + horizon
         # context
-        n_context_frames = len(self_frames)
-        xs_pred = self_frames[:n_context_frames].clone()
+        n_context_frames = len(memory_latent_frames)
+        xs_pred = memory_latent_frames[:n_context_frames].clone()
         curr_frame += n_context_frames
 
         pbar = tqdm(total=n_frames, initial=curr_frame, desc="Sampling")
 
         new_pose_condition_list = []
         last_frame = xs_pred[-1].clone()
-        last_pose_condition = self_poses[-1].clone()
+        last_pose_condition = memory_poses[-1].clone()
         curr_actions = new_actions.clone()
         for hi in range(len(new_actions)):
             last_pose_condition[:,3:] = last_pose_condition[:,3:] // 15
@@ -851,18 +851,18 @@ class WorldMemMinecraft(DiffusionForcingBase):
             new_pose_condition = new_pose_condition_list[ai:ai+next_horizon].clone()
 
             new_c2w_mat = euler_to_camera_to_world_matrix(new_pose_condition)
-            self_poses = torch.cat([self_poses, new_pose_condition])
-            self_actions = torch.cat([self_actions, curr_actions[:, None]])
-            self_memory_c2w = torch.cat([self_memory_c2w, new_c2w_mat])
-            new_indices = self_frame_idx[-1,0] + torch.arange(next_horizon, device=self_frame_idx.device) + 1
+            memory_poses = torch.cat([memory_poses, new_pose_condition])
+            memory_actions = torch.cat([memory_actions, curr_actions[:, None]])
+            memory_c2w = torch.cat([memory_c2w, new_c2w_mat])
+            new_indices = memory_frame_idx[-1,0] + torch.arange(next_horizon, device=memory_frame_idx.device) + 1
 
-            self_frame_idx = torch.cat([self_frame_idx, new_indices[:, None]])
+            memory_frame_idx = torch.cat([memory_frame_idx, new_indices[:, None]])
 
-            print(self_frame_idx)
-            conditions = self_actions.clone()
-            pose_conditions = self_poses.clone()
-            c2w_mat = self_memory_c2w .clone()
-            frame_idx = self_frame_idx.clone()
+            print(memory_frame_idx)
+            conditions = memory_actions.clone()
+            pose_conditions = memory_poses.clone()
+            c2w_mat = memory_c2w .clone()
+            frame_idx = memory_frame_idx.clone()
 
             # generation on frame
             scheduling_matrix = self._generate_scheduling_matrix(next_horizon)
@@ -923,8 +923,8 @@ class WorldMemMinecraft(DiffusionForcingBase):
             pbar.update(next_horizon)
             ai += next_horizon
 
-        self_frames = torch.cat([self_frames, xs_pred[n_context_frames:]])
+        memory_latent_frames = torch.cat([memory_latent_frames, xs_pred[n_context_frames:]])
         xs_pred = self.decode(xs_pred[n_context_frames:].to(device)).cpu()
 
-        return xs_pred.cpu().numpy(), self_frames.cpu().numpy(), self_actions.cpu().numpy(), \
-            self_poses.cpu().numpy(), self_memory_c2w.cpu().numpy(), self_frame_idx.cpu().numpy()
+        return xs_pred.cpu().numpy(), memory_latent_frames.cpu().numpy(), memory_actions.cpu().numpy(), \
+            memory_poses.cpu().numpy(), memory_c2w.cpu().numpy(), memory_frame_idx.cpu().numpy()

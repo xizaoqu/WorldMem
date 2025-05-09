@@ -5,7 +5,7 @@
 <p align="center">
   <img src="assets/worldmem_logo.png" alt="WORLDMEM Icon" width="80"/>
 </p>
-<h1 align="center"><strong>WORLDMEM: Long-term Consistent World Simulation with Memory</strong></h1>
+<h1 align="center"><strong>WorldMem: Long-term Consistent World Simulation <br> with Memory</strong></h1>
   <p align="center"><span><a href=""></a></span>
               <a href="https://xizaoqu.github.io">Zeqi Xiao<sup>1</sup></a>
               <a href="https://nirvanalan.github.io/">Yushi Lan<sup>1</sup></a>

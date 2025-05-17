@@ -288,12 +288,12 @@ class MemFullAttention(nn.Module):
 
     def forward(self, x: torch.Tensor, relative_embedding=False,
                 extra_condition=None,
-                cond_only_on_qk=False,
+                state_embed_only_on_qk=False,
                 reference_length=None):
 
         B, T, H, W, D = x.shape
 
-        if cond_only_on_qk:
+        if state_embed_only_on_qk:
             q, k, _ = self.to_qkv(x+extra_condition).chunk(3, dim=-1)
             _, _, v = self.to_qkv(x).chunk(3, dim=-1)
         else:

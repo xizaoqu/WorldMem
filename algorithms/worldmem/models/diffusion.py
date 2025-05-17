@@ -26,9 +26,9 @@ class Diffusion(nn.Module):
         is_dit: bool=False,
         use_plucker=False,
         relative_embedding=False,
-        cond_only_on_qk=False,
-        use_reference_attention=False,
-        add_frame_timestep_embedder=False,
+        state_embed_only_on_qk=False,
+        use_memory_attention=False,
+        add_timestamp_embedding=False,
         ref_mode='sequential'
     ):
         super().__init__()
@@ -54,9 +54,9 @@ class Diffusion(nn.Module):
         self.pose_cond_dim = pose_cond_dim
         self.use_plucker = use_plucker
         self.relative_embedding = relative_embedding
-        self.cond_only_on_qk = cond_only_on_qk
-        self.use_reference_attention = use_reference_attention
-        self.add_frame_timestep_embedder = add_frame_timestep_embedder
+        self.state_embed_only_on_qk = state_embed_only_on_qk
+        self.use_memory_attention = use_memory_attention
+        self.add_timestamp_embedding = add_timestamp_embedding
         self.ref_mode = ref_mode
 
         self._build_model()
@@ -69,9 +69,9 @@ class Diffusion(nn.Module):
                                             pose_cond_dim=self.pose_cond_dim, reference_length=self.reference_length,
                                             use_plucker=self.use_plucker,
                                             relative_embedding=self.relative_embedding,
-                                            cond_only_on_qk=self.cond_only_on_qk,
-                                            use_reference_attention=self.use_reference_attention,
-                                            add_frame_timestep_embedder=self.add_frame_timestep_embedder,
+                                            state_embed_only_on_qk=self.state_embed_only_on_qk,
+                                            use_memory_attention=self.use_memory_attention,
+                                            add_timestamp_embedding=self.add_timestamp_embedding,
                                             ref_mode=self.ref_mode)
         else:
             raise NotImplementedError

@@ -3,14 +3,15 @@ pose_cond_dim: 5
 use_plucker: true
 focal_length: 0.35
 customized_validation: true
-condition_similar_length: 8
+memory_condition_length: 8
 log_video: true
 relative_embedding: true
-cond_only_on_qk: true
-add_pose_embed: false
+state_embed_only_on_qk: true
 use_domain_adapter: false
-use_reference_attention: true
-add_frame_timestep_embedder: true
+use_memory_attention: true
+add_timestamp_embedding: true
+use_pose_prediction: true
+require_pose_prediction: true
 is_interactive: true
 diffusion:
   sampling_timesteps: 20

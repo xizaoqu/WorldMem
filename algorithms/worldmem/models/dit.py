@@ -153,8 +153,8 @@ class SpatioTemporalDiTBlock(nn.Module):
         reference_rotary_emb=None,
         use_plucker=False,
         relative_embedding=False,
-        cond_only_on_qk=False,
-        use_reference_attention=False,
+        state_embed_only_on_qk=False,
+        use_memory_attention=False,
         ref_mode='sequential'
     ):
         super().__init__()
@@ -196,8 +196,8 @@ class SpatioTemporalDiTBlock(nn.Module):
         )
         self.t_adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
 
-        self.use_reference_attention = use_reference_attention
-        if self.use_reference_attention:
+        self.use_memory_attention = use_memory_attention
+        if self.use_memory_attention:
             self.r_norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
             self.ref_type = "full_ref"
             if self.ref_type == "temporal_ref":
@@ -233,7 +233,7 @@ class SpatioTemporalDiTBlock(nn.Module):
 
         self.reference_length = reference_length
         self.relative_embedding = relative_embedding
-        self.cond_only_on_qk = cond_only_on_qk
+        self.state_embed_only_on_qk = state_embed_only_on_qk
 
         self.ref_mode = ref_mode
 
@@ -265,7 +265,7 @@ class SpatioTemporalDiTBlock(nn.Module):
         # memory block
         relative_embedding = self.relative_embedding # and mode == "training"
 
-        if self.use_reference_attention:
+        if self.use_memory_attention:
             r_shift_msa, r_scale_msa, r_gate_msa, r_shift_mlp, r_scale_mlp, r_gate_mlp = self.r_adaLN_modulation(c).chunk(6, dim=-1)
 
             if pose_cond is not None:
@@ -288,7 +288,7 @@ class SpatioTemporalDiTBlock(nn.Module):
                         # if current_frame == 18:
                         #     import pdb;pdb.set_trace()
 
-                        if self.cond_only_on_qk:
+                        if self.state_embed_only_on_qk:
                             attn_input = x1_zero_frame
                             extra_condition = input_cond                        
                         else:
@@ -304,7 +304,7 @@ class SpatioTemporalDiTBlock(nn.Module):
                     x = x + gate(self.r_attn(modulate(self.r_norm1(attn_input), r_shift_msa, r_scale_msa), 
                                     relative_embedding=relative_embedding, 
                                     extra_condition=extra_condition, 
-                                    cond_only_on_qk=self.cond_only_on_qk,
+                                    state_embed_only_on_qk=self.state_embed_only_on_qk,
                                     reference_length=reference_length), r_gate_msa)
                 else:
                     # pose_cond *= 0
@@ -354,9 +354,9 @@ class DiT(nn.Module):
         reference_length=8,
         use_plucker=False,
         relative_embedding=False,
-        cond_only_on_qk=False,
-        use_reference_attention=False,
-        add_frame_timestep_embedder=False,
+        state_embed_only_on_qk=False,
+        use_memory_attention=False,
+        add_timestamp_embedding=False,
         ref_mode='sequential'
     ):
         super().__init__()
@@ -369,9 +369,9 @@ class DiT(nn.Module):
         self.x_embedder = PatchEmbed(input_h, input_w, patch_size, in_channels, hidden_size, flatten=False)
         self.t_embedder = TimestepEmbedder(hidden_size)
 
-        self.add_frame_timestep_embedder = add_frame_timestep_embedder
-        if self.add_frame_timestep_embedder:
-            self.frame_timestep_embedder = TimestepEmbedder(hidden_size)
+        self.add_timestamp_embedding = add_timestamp_embedding
+        if self.add_timestamp_embedding:
+            self.timestamp_embedding = TimestepEmbedder(hidden_size)
 
         frame_h, frame_w = self.x_embedder.grid_size
 
@@ -404,14 +404,14 @@ class DiT(nn.Module):
                     reference_rotary_emb=self.reference_rotary_emb,
                     use_plucker=self.use_plucker,
                     relative_embedding=relative_embedding,
-                    cond_only_on_qk=cond_only_on_qk,
-                    use_reference_attention=use_reference_attention,
+                    state_embed_only_on_qk=state_embed_only_on_qk,
+                    use_memory_attention=use_memory_attention,
                     ref_mode=ref_mode
                 )
                 for _ in range(depth)
             ]
         )
-        self.use_reference_attention = use_reference_attention
+        self.use_memory_attention = use_memory_attention
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
         self.initialize_weights()
 
@@ -434,7 +434,7 @@ class DiT(nn.Module):
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
         nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
 
-        if self.use_reference_attention:
+        if self.use_memory_attention:
             if not self.use_plucker:
                 nn.init.normal_(self.position_embedder.mlp[0].weight, std=0.02)
                 nn.init.normal_(self.position_embedder.mlp[2].weight, std=0.02)
@@ -442,9 +442,9 @@ class DiT(nn.Module):
                 nn.init.normal_(self.angle_embedder.mlp[0].weight, std=0.02)
                 nn.init.normal_(self.angle_embedder.mlp[2].weight, std=0.02)
             
-            if self.add_frame_timestep_embedder:
-                nn.init.normal_(self.frame_timestep_embedder.mlp[0].weight, std=0.02)
-                nn.init.normal_(self.frame_timestep_embedder.mlp[2].weight, std=0.02)
+            if self.add_timestamp_embedding:
+                nn.init.normal_(self.timestamp_embedding.mlp[0].weight, std=0.02)
+                nn.init.normal_(self.timestamp_embedding.mlp[2].weight, std=0.02)
 
 
         # Zero-out adaLN modulation layers in DiT blocks:
@@ -454,7 +454,7 @@ class DiT(nn.Module):
             nn.init.constant_(block.t_adaLN_modulation[-1].weight, 0)
             nn.init.constant_(block.t_adaLN_modulation[-1].bias, 0)
 
-            if self.use_plucker and self.use_reference_attention:
+            if self.use_plucker and self.use_memory_attention:
                 nn.init.constant_(block.pose_cond_mlp.weight, 0)
                 nn.init.constant_(block.pose_cond_mlp.bias, 0)
 
@@ -526,10 +526,10 @@ class DiT(nn.Module):
                 pc = self.pose_embedder(pose_cond)
                 pc = pc.permute(1,0,2,3,4)
 
-                if torch.is_tensor(frame_idx) and self.add_frame_timestep_embedder:
+                if torch.is_tensor(frame_idx) and self.add_timestamp_embedding:
                     bb = frame_idx.shape[1]
                     frame_idx = rearrange(frame_idx, "t b -> (b t)")
-                    frame_idx = self.frame_timestep_embedder(frame_idx)
+                    frame_idx = self.timestamp_embedding(frame_idx)
                     frame_idx = rearrange(frame_idx, "(b t) d -> b t d", b=bb)
                     pc = pc + frame_idx[:, :, None, None]
 
@@ -545,17 +545,12 @@ class DiT(nn.Module):
         x = rearrange(x, "b t h w d -> (b t) h w d")
         x = self.unpatchify(x)  # (N, out_channels, H, W)
         x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
-
-        # print("self.blocks[0].pose_cond_mlp.weight:", self.blocks[0].pose_cond_mlp.weight)
-        # print("self.blocks[0].r_adaLN_modulation[1].weight:", self.blocks[0].r_adaLN_modulation[1].weight)
-        # print("self.blocks[0].t_adaLN_modulation[1].weight:", self.blocks[0].t_adaLN_modulation[1].weight)
-
         return x
 
 
 def DiT_S_2(action_cond_dim, pose_cond_dim, reference_length, 
 use_plucker, relative_embedding, 
-cond_only_on_qk, use_reference_attention, add_frame_timestep_embedder,
+state_embed_only_on_qk, use_memory_attention, add_timestamp_embedding,
 ref_mode):
     return DiT(
         patch_size=2,
@@ -567,9 +562,9 @@ ref_mode):
         reference_length=reference_length,
         use_plucker=use_plucker,
         relative_embedding=relative_embedding,
-        cond_only_on_qk=cond_only_on_qk,
-        use_reference_attention=use_reference_attention,
-        add_frame_timestep_embedder=add_frame_timestep_embedder,
+        state_embed_only_on_qk=state_embed_only_on_qk,
+        use_memory_attention=use_memory_attention,
+        add_timestamp_embedding=add_timestamp_embedding,
         ref_mode=ref_mode
     )
 

@@ -34,11 +34,23 @@ def load_custom_checkpoint(algo, checkpoint_path):
         model_path = hf_hub_download(repo_id=repo_id, 
                             filename=file_name)
         ckpt = torch.load(model_path, map_location=torch.device('cpu'))
-        algo.load_state_dict(ckpt['state_dict'], strict=False)
+
+        algo.load_state_dict(ckpt['state_dict'], strict=True)
         print("Load: ", model_path)
     except:
         ckpt = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-        algo.load_state_dict(ckpt['state_dict'], strict=False)      
+
+        filtered_state_dict = {}
+        for k, v in ckpt['state_dict'].items():
+            if "frame_timestep_embedder" in k:
+                new_k = k.replace("frame_timestep_embedder", "timestamp_embedding")
+                filtered_state_dict[new_k] = v
+            else:
+                filtered_state_dict[k] = v
+
+        algo.load_state_dict(filtered_state_dict, strict=True)
+
+        # algo.load_state_dict(ckpt['state_dict'], strict=True)      
         print("Load: ", checkpoint_path)  
 
 def download_assets_if_needed():
@@ -233,11 +245,11 @@ def set_context_length(context_length, sampling_context_length_state):
     print("set context length to", worldmem.n_tokens)
     return sampling_context_length_state
 
-def set_memory_length(memory_length, sampling_memory_length_state):
-    worldmem.condition_similar_length = memory_length
-    sampling_memory_length_state = memory_length
-    print("set memory length to", worldmem.condition_similar_length)
-    return sampling_memory_length_state
+def set_memory_condition_length(memory_condition_length, sampling_memory_condition_length_state):
+    worldmem.memory_condition_length = memory_condition_length
+    sampling_memory_condition_length_state = memory_condition_length
+    print("set memory length to", worldmem.memory_condition_length)
+    return sampling_memory_condition_length_state
 
 def set_next_frame_length(next_frame_length, sampling_next_frame_length_state):
     worldmem.next_frame_length = next_frame_length
@@ -509,8 +521,8 @@ with gr.Blocks(css=css) as demo:
                 label="Context Length",
                 info="How many previous frames in temporal context window."
             )
-            slider_memory_length = gr.Slider(
-                minimum=4, maximum=16, value=worldmem.condition_similar_length, step=1,
+            slider_memory_condition_length = gr.Slider(
+                minimum=4, maximum=16, value=worldmem.memory_condition_length, step=1,
                 label="Memory Length",
                 info="How many previous frames in memory window. (Recommended: 1, multi-frame generation is not stable yet)"
             )
@@ -522,7 +534,7 @@ with gr.Blocks(css=css) as demo:
     
     sampling_timesteps_state = gr.State(worldmem.sampling_timesteps)
     sampling_context_length_state = gr.State(worldmem.n_tokens)
-    sampling_memory_length_state = gr.State(worldmem.condition_similar_length)
+    sampling_memory_condition_length_state = gr.State(worldmem.memory_condition_length)
     sampling_next_frame_length_state = gr.State(worldmem.next_frame_length)
 
     video_frames = gr.State(load_image_as_tensor(selected_image.value)[None].numpy())
@@ -547,7 +559,7 @@ with gr.Blocks(css=css) as demo:
 
     examples = gr.Examples(
         examples=example_images,
-        inputs=[example_case, image_output, log_output, slider_denoising_step, slider_context_length, slider_memory_length],
+        inputs=[example_case, image_output, log_output, slider_denoising_step, slider_context_length, slider_memory_condition_length],
         cache_examples=False
     )
 
@@ -574,7 +586,7 @@ with gr.Blocks(css=css) as demo:
 
     slider_denoising_step.change(fn=set_denoising_steps, inputs=[slider_denoising_step, sampling_timesteps_state], outputs=sampling_timesteps_state)
     slider_context_length.change(fn=set_context_length, inputs=[slider_context_length, sampling_context_length_state], outputs=sampling_context_length_state)
-    slider_memory_length.change(fn=set_memory_length, inputs=[slider_memory_length, sampling_memory_length_state], outputs=sampling_memory_length_state)
+    slider_memory_condition_length.change(fn=set_memory_condition_length, inputs=[slider_memory_condition_length, sampling_memory_condition_length_state], outputs=sampling_memory_condition_length_state)
     slider_next_frame_length.change(fn=set_next_frame_length, inputs=[slider_next_frame_length, sampling_next_frame_length_state], outputs=sampling_next_frame_length_state)
 
-demo.launch()
+demo.launch(share=True)

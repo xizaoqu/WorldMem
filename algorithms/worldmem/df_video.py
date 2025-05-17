@@ -1,3 +1,4 @@
+import os
 import random
 import math
 import numpy as np
@@ -19,7 +20,7 @@ from .df_base import DiffusionForcingBase
 from .models.vae import VAE_models
 from .models.diffusion import Diffusion
 from .models.pose_prediction import PosePredictionNet
-
+import glob
 
 # Utility Functions
 def euler_to_rotation_matrix(pitch, yaw):
@@ -337,27 +338,28 @@ class WorldMemMinecraft(DiffusionForcingBase):
         self.n_frames = cfg.n_frames
         if hasattr(cfg, "n_tokens"):
             self.n_tokens = cfg.n_tokens // cfg.frame_stack
-        self.condition_similar_length = cfg.condition_similar_length
-        self.pose_cond_dim = cfg.pose_cond_dim
+        self.memory_condition_length = cfg.memory_condition_length
+        self.pose_cond_dim = getattr(cfg, "pose_cond_dim", 5)
 
         self.use_plucker = cfg.use_plucker
         self.relative_embedding = cfg.relative_embedding
-        self.cond_only_on_qk = cfg.cond_only_on_qk
-        self.use_reference_attention = cfg.use_reference_attention
-        self.add_frame_timestep_embedder = cfg.add_frame_timestep_embedder
+        self.state_embed_only_on_qk = getattr(cfg, "state_embed_only_on_qk", True)
+        self.use_memory_attention = getattr(cfg, "use_memory_attention", True)
+        self.add_timestamp_embedding = cfg.add_timestamp_embedding
         self.ref_mode = getattr(cfg, "ref_mode", 'sequential')
         self.log_curve = getattr(cfg, "log_curve", False)
-        self.focal_length = cfg.focal_length
+        self.focal_length =  getattr(cfg, "focal_length", 0.35)
         self.log_video = cfg.log_video
         self.self_consistency_eval = getattr(cfg, "self_consistency_eval", False)
-        self.next_frame_length = cfg.next_frame_length
+        self.next_frame_length = getattr(cfg, "next_frame_length", 1)
+        self.require_pose_prediction = getattr(cfg, "require_pose_prediction", False)
 
         super().__init__(cfg)
             
     def _build_model(self):
 
         self.diffusion_model = Diffusion(
-            reference_length=self.condition_similar_length,
+            reference_length=self.memory_condition_length,
             x_shape=self.x_stacked_shape,
             action_cond_dim=self.action_cond_dim,
             pose_cond_dim=self.pose_cond_dim,
@@ -366,19 +368,18 @@ class WorldMemMinecraft(DiffusionForcingBase):
             is_dit=True,
             use_plucker=self.use_plucker,
             relative_embedding=self.relative_embedding,
-            cond_only_on_qk=self.cond_only_on_qk,
-            use_reference_attention=self.use_reference_attention,
-            add_frame_timestep_embedder=self.add_frame_timestep_embedder,
+            state_embed_only_on_qk=self.state_embed_only_on_qk,
+            use_memory_attention=self.use_memory_attention,
+            add_timestamp_embedding=self.add_timestamp_embedding,
             ref_mode=self.ref_mode
         )
 
-        # self.register_data_mean_std(self.cfg.data_mean, self.cfg.data_std)
         self.validation_lpips_model = LearnedPerceptualImagePatchSimilarity()
-
         vae = VAE_models["vit-l-20-shallow-encoder"]()
         self.vae = vae.eval()
 
-        self.pose_prediction_model = PosePredictionNet()
+        if self.require_pose_prediction:
+            self.pose_prediction_model = PosePredictionNet()
 
     def _generate_noise_levels(self, xs: torch.Tensor, masks = None) -> torch.Tensor:
         """
@@ -422,7 +423,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
                 for i in range(self.n_frames):
                     input_pose_condition.append(
                         convert_to_plucker(
-                            torch.cat([c2w_mat[i:i + 1], c2w_mat[-self.condition_similar_length:]]).clone(),
+                            torch.cat([c2w_mat[i:i + 1], c2w_mat[-self.memory_condition_length:]]).clone(),
                             0,
                             focal_length=self.focal_length,
                             image_height=xs.shape[-2],image_width=xs.shape[-1]
@@ -431,7 +432,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
                     frame_idx_list.append(
                         torch.cat([
                             frame_idx[i:i + 1] - frame_idx[i:i + 1],
-                            frame_idx[-self.condition_similar_length:] - frame_idx[i:i + 1]
+                            frame_idx[-self.memory_condition_length:] - frame_idx[i:i + 1]
                         ]).clone()
                     )
                 input_pose_condition = torch.cat(input_pose_condition)
@@ -449,21 +450,21 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
         noise_levels = self._generate_noise_levels(xs)
 
-        if self.condition_similar_length:
-            noise_levels[-self.condition_similar_length:] = self.diffusion_model.stabilization_level
-            conditions[-self.condition_similar_length:] *= 0
+        if self.memory_condition_length:
+            noise_levels[-self.memory_condition_length:] = self.diffusion_model.stabilization_level
+            conditions[-self.memory_condition_length:] *= 0
 
         _, loss = self.diffusion_model(
             xs,
             conditions,
             input_pose_condition,
             noise_levels=noise_levels,
-            reference_length=self.condition_similar_length,
+            reference_length=self.memory_condition_length,
             frame_idx=frame_idx_list
         )
 
-        if self.condition_similar_length:
-            loss = loss[:-self.condition_similar_length]
+        if self.memory_condition_length:
+            loss = loss[:-self.memory_condition_length]
 
         loss = self.reweight_loss(loss, None)
 
@@ -472,7 +473,6 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
         return {"loss": loss}
     
-
     def on_validation_epoch_end(self, namespace="validation") -> None:
         if not self.validation_step_outputs:
             return
@@ -577,12 +577,12 @@ class WorldMemMinecraft(DiffusionForcingBase):
         x = rearrange(x, "(t b) c h w-> t b c h w", t=total_frames)
         return x
 
-    def _generate_condition_indices(self, curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx, horizon):
+    def _generate_condition_indices(self, curr_frame, memory_condition_length, xs_pred, pose_conditions, frame_idx, horizon):
         """
         Generate indices for condition similarity based on the current frame and pose conditions.
         """
-        if curr_frame < condition_similar_length:
-            random_idx = [i for i in range(curr_frame)] + [0] * (condition_similar_length - curr_frame)
+        if curr_frame < memory_condition_length:
+            random_idx = [i for i in range(curr_frame)] + [0] * (memory_condition_length - curr_frame)
             random_idx = np.repeat(np.array(random_idx)[:, None], xs_pred.shape[1], -1)
         else:
             # Generate points in a sphere and filter based on field of view
@@ -614,7 +614,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
             ])
 
             random_idx = []
-            for _ in range(condition_similar_length):
+            for _ in range(memory_condition_length):
                 overlap_ratio = ((in_fov1.bool() & in_fov_list).sum(1)) / in_fov1.sum()
                 
                 confidence = overlap_ratio + (curr_frame - frame_idx[:curr_frame]) / curr_frame * (-0.2)
@@ -674,15 +674,15 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
         return input_condition, input_pose_condition, frame_idx_list
 
-    def _prepare_noise_levels(self, scheduling_matrix, m, curr_frame, batch_size, condition_similar_length):
+    def _prepare_noise_levels(self, scheduling_matrix, m, curr_frame, batch_size, memory_condition_length):
         """
         Prepare noise levels for the current sampling step.
         """
         from_noise_levels = np.concatenate((np.zeros((curr_frame,), dtype=np.int64), scheduling_matrix[m]))[:, None].repeat(batch_size, axis=1)
         to_noise_levels = np.concatenate((np.zeros((curr_frame,), dtype=np.int64), scheduling_matrix[m + 1]))[:, None].repeat(batch_size, axis=1)
-        if condition_similar_length:
-            from_noise_levels = np.concatenate([from_noise_levels, np.zeros((condition_similar_length, from_noise_levels.shape[-1]), dtype=np.int32)], axis=0)
-            to_noise_levels = np.concatenate([to_noise_levels, np.zeros((condition_similar_length, from_noise_levels.shape[-1]), dtype=np.int32)], axis=0)
+        if memory_condition_length:
+            from_noise_levels = np.concatenate([from_noise_levels, np.zeros((memory_condition_length, from_noise_levels.shape[-1]), dtype=np.int32)], axis=0)
+            to_noise_levels = np.concatenate([to_noise_levels, np.zeros((memory_condition_length, from_noise_levels.shape[-1]), dtype=np.int32)], axis=0)
         from_noise_levels = torch.from_numpy(from_noise_levels).to(self.device)
         to_noise_levels = torch.from_numpy(to_noise_levels).to(self.device)
         return from_noise_levels, to_noise_levels
@@ -703,7 +703,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
             None: Appends the predicted and ground truth frames to `self.validation_step_outputs`.
         """
         # Preprocess the input batch
-        condition_similar_length = self.condition_similar_length
+        memory_condition_length = self.memory_condition_length
         xs_raw, conditions, pose_conditions, c2w_mat, frame_idx = self._preprocess_batch(batch)
 
 
@@ -744,9 +744,9 @@ class WorldMemMinecraft(DiffusionForcingBase):
             pbar.set_postfix({"start": start_frame, "end": curr_frame + horizon})
 
             # Handle condition similarity logic
-            if condition_similar_length:
+            if memory_condition_length:
                 random_idx = self._generate_condition_indices(
-                    curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx
+                    curr_frame, memory_condition_length, xs_pred, pose_conditions, frame_idx, horizon
                 )
 
                 xs_pred = torch.cat([xs_pred, xs_pred[random_idx[:, range(xs_pred.shape[1])], range(xs_pred.shape[1])].clone()], 0)
@@ -760,7 +760,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
             # Perform sampling for each step in the scheduling matrix
             for m in range(scheduling_matrix.shape[0] - 1):
                 from_noise_levels, to_noise_levels = self._prepare_noise_levels(
-                    scheduling_matrix, m, curr_frame, batch_size, condition_similar_length
+                    scheduling_matrix, m, curr_frame, batch_size, memory_condition_length
                 )
 
                 xs_pred[start_frame:] = self.diffusion_model.sample_step(
@@ -771,13 +771,13 @@ class WorldMemMinecraft(DiffusionForcingBase):
                     to_noise_levels[start_frame:],
                     current_frame=curr_frame,
                     mode="validation",
-                    reference_length=condition_similar_length,
+                    reference_length=memory_condition_length,
                     frame_idx=frame_idx_list
                 ).cpu()
 
             # Remove condition similarity frames if applicable
-            if condition_similar_length:
-                xs_pred = xs_pred[:-condition_similar_length]
+            if memory_condition_length:
+                xs_pred = xs_pred[:-memory_condition_length]
 
             curr_frame += horizon
             pbar.update(horizon)
@@ -794,7 +794,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
     def interactive(self, first_frame, new_actions, first_pose, device,
                     memory_latent_frames, memory_actions, memory_poses, memory_c2w, memory_frame_idx):
     
-        condition_similar_length = self.condition_similar_length
+        memory_condition_length = self.memory_condition_length
 
         if memory_latent_frames is None:
             first_frame = torch.from_numpy(first_frame)
@@ -881,13 +881,13 @@ class WorldMemMinecraft(DiffusionForcingBase):
             )
 
             # Handle condition similarity logic
-            if condition_similar_length:
+            if memory_condition_length:
                 random_idx = self._generate_condition_indices(
-                    curr_frame, condition_similar_length, xs_pred, pose_conditions, frame_idx, next_horizon
+                    curr_frame, memory_condition_length, xs_pred, pose_conditions, frame_idx, next_horizon
                 )
                 
                 # random_idx = np.unique(random_idx)[:, None]
-                # condition_similar_length = len(random_idx)
+                # memory_condition_length = len(random_idx)
                 xs_pred = torch.cat([xs_pred, xs_pred[random_idx[:, range(xs_pred.shape[1])], range(xs_pred.shape[1])].clone()], 0)
 
             # Prepare input conditions and pose conditions
@@ -899,7 +899,7 @@ class WorldMemMinecraft(DiffusionForcingBase):
             # Perform sampling for each step in the scheduling matrix
             for m in range(scheduling_matrix.shape[0] - 1):
                 from_noise_levels, to_noise_levels = self._prepare_noise_levels(
-                    scheduling_matrix, m, curr_frame, batch_size, condition_similar_length
+                    scheduling_matrix, m, curr_frame, batch_size, memory_condition_length
                 )
 
                 xs_pred[start_frame:] = self.diffusion_model.sample_step(
@@ -910,13 +910,13 @@ class WorldMemMinecraft(DiffusionForcingBase):
                     to_noise_levels[start_frame:],
                     current_frame=curr_frame,
                     mode="validation",
-                    reference_length=condition_similar_length,
+                    reference_length=memory_condition_length,
                     frame_idx=frame_idx_list
                 ).cpu()
 
 
-            if condition_similar_length:
-                xs_pred = xs_pred[:-condition_similar_length]
+            if memory_condition_length:
+                xs_pred = xs_pred[:-memory_condition_length]
 
             curr_frame += next_horizon
             pbar.update(next_horizon)

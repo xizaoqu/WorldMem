@@ -68,9 +68,9 @@ To enable cloud logging with [Weights & Biases (wandb)](https://wandb.ai/site), 
 
 Download pretrained weights from [Oasis](https://github.com/etched-ai/open-oasis).
 
-We train on 4 H100 GPUs.
+Training the model on 4 H100 GPUs, it converges after approximately 500K steps.
 We observe that gradually increasing task difficulty improves performance. Thus, we adopt a multi-stage training strategy:
-
+, 
 ```bash
 sh train_stage_1.sh   # Small range, no vertical turning
 sh train_stage_2.sh   # Large range, no vertical turning

@@ -68,6 +68,7 @@ To enable cloud logging with [Weights & Biases (wandb)](https://wandb.ai/site), 
 
 Download pretrained weights from [Oasis](https://github.com/etched-ai/open-oasis).
 
+We train on 4 H100 GPUs.
 We observe that gradually increasing task difficulty improves performance. Thus, we adopt a multi-stage training strategy:
 
 ```bash

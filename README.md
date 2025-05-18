@@ -39,6 +39,7 @@ https://github.com/user-attachments/assets/fb8a32e2-9470-4819-a93d-c38caf76d72c
 conda create python=3.10 -n worldmem
 conda activate worldmem
 pip install -r requirements.txt
+conda install -c conda-forge ffmpeg=4.3.2
 ```
 
 
@@ -48,11 +49,81 @@ pip install -r requirements.txt
 python app.py
 ```
 
+## Training and Inference
+
+To enable cloud logging with [Weights & Biases (wandb)](https://wandb.ai/site), follow these steps:
+
+1. Sign up for a wandb account.
+2. Run the following command to log in:
+
+    ```bash
+    wandb login
+    ```
+
+3. Open `configurations/training.yaml` and set the `entity` and `project` field to your wandb username.
+
+---
+
+### Training
+
+We observe that gradually increasing task difficulty improves performance. Thus, we adopt a multi-stage training strategy:
+
+```bash
+sh train_stage_1.sh   # Small range, no vertical turning
+sh train_stage_2.sh   # Large range, no vertical turning
+sh train_stage_3.sh   # Large range, with vertical turning
+```
+
+To resume training from a previous checkpoint, configure the `resume` and `output_dir` variables in the corresponding `.sh` script.
+
+---
+
+### Inference
+
+To run inference:
+
+```bash
+sh infer.sh
+```
+
+You can either **load the diffusion model and VAE separately**:
+
+```bash
++diffusion_model_path=yslan/worldmem_checkpoints/diffusion_only.ckpt \
++vae_path=yslan/worldmem_checkpoints/vae_only.ckpt \
++customized_load=true \
++seperate_load=true \
+```
+
+Or **load a combined checkpoint**:
+
+```bash
++load=your_model_path \
++customized_load=true \
++seperate_load=false \
+```
+
+---
+
+## Dataset
+
+Download the Minecraft dataset from [Hugging Face](https://huggingface.co/datasets/zeqixiao/worldmem_minecraft_dataset)
+
+Place the dataset in the following directory structure:
+
+```
+data/
+└── minecraft/
+    ├── training/
+    └── validation/
+```
+
+
 ## TODO
 
 - [x] Release inference models and weights;
-- [ ] Release training pipeline on Minecraft;
-- [ ] Release training data on Minecraft;
+- [x] Release training pipeline on Minecraft;
+- [x] Release training data on Minecraft;
 
 
 

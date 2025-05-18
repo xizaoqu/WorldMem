@@ -23,11 +23,23 @@ from huggingface_hub import hf_hub_download
 import tempfile
 import os
 import requests
+from huggingface_hub import model_info
+
+
+def is_huggingface_model(path: str) -> bool:
+    hf_ckpt = str(path).split('/')
+    repo_id = '/'.join(hf_ckpt[:2])
+    try:
+        model_info(repo_id)
+        return True
+    except:
+        return False
+    
 
 torch.set_float32_matmul_precision("high")
 
 def load_custom_checkpoint(algo, checkpoint_path):
-    try:
+    if is_huggingface_model(str(checkpoint_path)):
         hf_ckpt = str(checkpoint_path).split('/')
         repo_id = '/'.join(hf_ckpt[:2])
         file_name = '/'.join(hf_ckpt[2:])
@@ -35,9 +47,17 @@ def load_custom_checkpoint(algo, checkpoint_path):
                             filename=file_name)
         ckpt = torch.load(model_path, map_location=torch.device('cpu'))
 
-        algo.load_state_dict(ckpt['state_dict'], strict=True)
+        filtered_state_dict = {}
+        for k, v in ckpt['state_dict'].items():
+            if "frame_timestep_embedder" in k:
+                new_k = k.replace("frame_timestep_embedder", "timestamp_embedding")
+                filtered_state_dict[new_k] = v
+            else:
+                filtered_state_dict[k] = v
+
+        algo.load_state_dict(filtered_state_dict, strict=True)
         print("Load: ", model_path)
-    except:
+    else:
         ckpt = torch.load(checkpoint_path, map_location=torch.device('cpu'))
 
         filtered_state_dict = {}
@@ -192,13 +212,21 @@ SUNFLOWERS_RAIN_IMAGE = "assets/rain_sunflower_plains.png"
 device = torch.device('cuda')
 
 def save_video(frames, path="output.mp4", fps=10):
+    temp_path = path[:-4] + "_temp.mp4"
     h, w, _ = frames[0].shape
-    out = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+
+    out = cv2.VideoWriter(temp_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
     for frame in frames:
         out.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
     out.release()
 
-    return path
+    ffmpeg_cmd = [
+        "ffmpeg", "-y", "-i", temp_path,
+        "-c:v", "libx264", "-crf", "23", "-preset", "medium",
+        path
+    ]
+    subprocess.run(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.remove(temp_path)
 
 cfg = OmegaConf.load("configurations/huggingface.yaml")
 worldmem = WorldMemMinecraft(cfg)

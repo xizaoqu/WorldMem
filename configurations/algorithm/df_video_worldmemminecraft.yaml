@@ -1,0 +1,43 @@
+defaults:
+  - df_base
+
+n_frames: ${dataset.n_frames}
+frame_skip: ${dataset.frame_skip}
+metadata: ${dataset.metadata}
+
+# training hyperparameters
+weight_decay: 2e-3
+warmup_steps: 1000
+optimizer_beta: [0.9, 0.99]
+action_cond_dim: 25
+use_plucker: true
+
+diffusion:
+  # training
+  beta_schedule: sigmoid
+  objective: pred_v
+  use_fused_snr: True
+  cum_snr_decay: 0.96
+  clip_noise: 20.
+  # sampling
+  sampling_timesteps: 20
+  ddim_sampling_eta: 0.0
+  stabilization_level: 15
+  # architecture
+  architecture:
+    network_size: 64
+    attn_heads: 4
+    attn_dim_head: 64
+    dim_mults: [1, 2, 4, 8]
+    resolution: ${dataset.resolution}
+    attn_resolutions: [16, 32, 64, 128]
+    use_init_temporal_attn: True
+    use_linear_attn: True
+    time_emb_type: rotary
+
+metrics:
+  # - fvd
+  # - fid
+  # - lpips
+
+_name: df_video_worldmemminecraft

@@ -56,6 +56,7 @@ def load_custom_checkpoint(algo, checkpoint_path):
         model_path = hf_hub_download(repo_id=repo_id, filename=file_name)
         ckpt = torch.load(model_path, map_location=torch.device('cpu'))
 
+        # quick workaround
         filtered_state_dict = {}
         for k, v in ckpt['state_dict'].items():
             if "frame_timestep_embedder" in k:

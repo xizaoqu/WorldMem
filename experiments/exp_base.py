@@ -64,7 +64,7 @@ def load_custom_checkpoint(algo, checkpoint_path):
             else:
                 filtered_state_dict[k] = v
 
-        algo.load_state_dict(filtered_state_dict, strict=True)
+        algo.load_state_dict(filtered_state_dict, strict=False)
 
     elif checkpoint_path.suffix == ".pt":
         # Load from a .pt file

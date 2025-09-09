@@ -296,17 +296,17 @@ class BaseLightningExperiment(BaseExperiment):
 
         trainer = pl.Trainer(
             accelerator="auto",
-            devices="auto",  # 自动选择设备
+            devices="auto",
             strategy=DDPStrategy(find_unused_parameters=True) if torch.cuda.device_count() > 1 else "auto",
-            logger=self.logger or False,  # 简化写法
+            logger=self.logger or False,
             callbacks=callbacks,
-            gradient_clip_val=self.cfg.training.optim.gradient_clip_val or 0.0,  # 确保默认值
+            gradient_clip_val=self.cfg.training.optim.gradient_clip_val or 0.0,
             val_check_interval=self.cfg.validation.val_every_n_step if self.cfg.validation.val_every_n_step else None,
             limit_val_batches=self.cfg.validation.limit_batch,
             check_val_every_n_epoch=self.cfg.validation.val_every_n_epoch if not self.cfg.validation.val_every_n_step else None,
-            accumulate_grad_batches=self.cfg.training.optim.accumulate_grad_batches or 1,  # 默认累积为1
-            precision=self.cfg.training.precision or 32,  # 默认32位精度
-            detect_anomaly=False,  # 默认关闭异常检测
+            accumulate_grad_batches=self.cfg.training.optim.accumulate_grad_batches or 1,
+            precision=self.cfg.training.precision or 32,
+            detect_anomaly=False,
             num_sanity_val_steps=int(self.cfg.debug) if self.cfg.debug else 0,
             max_epochs=self.cfg.training.max_epochs,
             max_steps=self.cfg.training.max_steps,
@@ -316,7 +316,10 @@ class BaseLightningExperiment(BaseExperiment):
 
         if self.customized_load:
             if self.seperate_load:
-                load_custom_checkpoint(algo=self.algo.diffusion_model,checkpoint_path=self.diffusion_model_path)
+                if 'oasis500m' in self.diffusion_model_path:
+                    load_custom_checkpoint(algo=self.algo.diffusion_model.model,checkpoint_path=self.diffusion_model_path)
+                else:
+                    load_custom_checkpoint(algo=self.algo.diffusion_model,checkpoint_path=self.diffusion_model_path)
                 load_custom_checkpoint(algo=self.algo.vae,checkpoint_path=self.vae_path)
             else:
                 load_custom_checkpoint(algo=self.algo,checkpoint_path=self.ckpt_path)
@@ -382,7 +385,10 @@ class BaseLightningExperiment(BaseExperiment):
 
         if self.customized_load:
             if self.seperate_load:
-                load_custom_checkpoint(algo=self.algo.diffusion_model,checkpoint_path=self.diffusion_model_path)
+                if 'oasis500m' in self.diffusion_model_path:
+                    load_custom_checkpoint(algo=self.algo.diffusion_model.model,checkpoint_path=self.diffusion_model_path)
+                else:
+                    load_custom_checkpoint(algo=self.algo.diffusion_model,checkpoint_path=self.diffusion_model_path)
                 load_custom_checkpoint(algo=self.algo.vae,checkpoint_path=self.vae_path)
             else:
                 load_custom_checkpoint(algo=self.algo,checkpoint_path=self.ckpt_path)

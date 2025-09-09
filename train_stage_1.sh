@@ -2,8 +2,8 @@ wandb enabled
 
 # set -e
 python -m main +name=train \
-    +diffusion_model_path=your_diffusion_model_path \
-    +vae_path=your_vae_path \
+    +diffusion_model_path=/home/zeqi001/.cache/huggingface/hub/models--Etched--oasis-500m/snapshots/4ca7d2d811f4f0c6fd1d5719bf83f14af3446c0c/oasis500m.safetensors \
+    +vae_path=/home/zeqi001/.cache/huggingface/hub/models--Etched--oasis-500m/snapshots/4ca7d2d811f4f0c6fd1d5719bf83f14af3446c0c/vit-l-20.safetensors \
     +customized_load=true \
     +seperate_load=true \
     +zero_init_gate=true \

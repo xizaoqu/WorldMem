@@ -14,7 +14,7 @@
               <a href="https://williamyang1991.github.io/">Shuai Yang<sup>2</sup></a>
               <a href="https://zengyh1900.github.io/">Yanhong Zeng<sup>3</sup></a>
               <a href="https://xingangpan.github.io/">Xingang Pan<sup>1</sup></a>    <br>
-    <sup>1</sup>S-Lab, Nanyang Technological University, <br> <sup>2</sup>Wangxuan Institute of Computer Technology, Peking University,<br>  <sup>3</sup>Shanghai AI Laboratry
+    <sup>1</sup>S-Lab, Nanyang Technological University, <br> <sup>2</sup>Wangxuan Institute of Computer Technology, Peking University,<br>  <sup>3</sup>Shanghai AI Laboratory
     </p>
 </p>
 

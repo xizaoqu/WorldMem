@@ -139,6 +139,7 @@ python calculate_fid.py --videos_dir outputs/2025-11-30/00-02-42/videos/test_vis
 | FID    | 15.13  |
 
 *Note: FID is computed over 5000 frames.*
+
 *Note: Previous versions incorrectly used `data_range=2.0` for PSNR calculation, but the decoded video data is in the range [0, 1], so `data_range=1.0` should be used. This bug inflated PSNR values by approximately 6 dB. We have now corrected this in the latest version by clipping predictions to [0, 1] before metric computation. The relative performance comparisons and conclusions remain unchanged.*
 
 ---

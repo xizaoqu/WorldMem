@@ -25,53 +25,9 @@ import os
 import requests
 from huggingface_hub import model_info
 
-
-def is_huggingface_model(path: str) -> bool:
-    hf_ckpt = str(path).split('/')
-    repo_id = '/'.join(hf_ckpt[:2])
-    try:
-        model_info(repo_id)
-        return True
-    except:
-        return False
-    
+from experiments.exp_base import load_custom_checkpoint
 
 torch.set_float32_matmul_precision("high")
-
-def load_custom_checkpoint(algo, checkpoint_path):
-    if is_huggingface_model(str(checkpoint_path)):
-        hf_ckpt = str(checkpoint_path).split('/')
-        repo_id = '/'.join(hf_ckpt[:2])
-        file_name = '/'.join(hf_ckpt[2:])
-        model_path = hf_hub_download(repo_id=repo_id, 
-                            filename=file_name)
-        ckpt = torch.load(model_path, map_location=torch.device('cpu'))
-
-        filtered_state_dict = {}
-        for k, v in ckpt['state_dict'].items():
-            if "frame_timestep_embedder" in k:
-                new_k = k.replace("frame_timestep_embedder", "timestamp_embedding")
-                filtered_state_dict[new_k] = v
-            else:
-                filtered_state_dict[k] = v
-
-        algo.load_state_dict(filtered_state_dict, strict=True)
-        print("Load: ", model_path)
-    else:
-        ckpt = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-
-        filtered_state_dict = {}
-        for k, v in ckpt['state_dict'].items():
-            if "frame_timestep_embedder" in k:
-                new_k = k.replace("frame_timestep_embedder", "timestamp_embedding")
-                filtered_state_dict[new_k] = v
-            else:
-                filtered_state_dict[k] = v
-
-        algo.load_state_dict(filtered_state_dict, strict=True)
-
-        # algo.load_state_dict(ckpt['state_dict'], strict=True)      
-        print("Load: ", checkpoint_path)  
 
 def download_assets_if_needed():
     ASSETS_URL_BASE = "https://huggingface.co/spaces/yslan/worldmem/resolve/main/assets/examples"

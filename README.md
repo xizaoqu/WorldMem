@@ -49,7 +49,7 @@ conda install -c conda-forge ffmpeg=4.3.2
 python app.py
 ```
 
-## Training and Inference
+## Run
 
 To enable cloud logging with [Weights & Biases (wandb)](https://wandb.ai/site), follow these steps:
 
@@ -92,8 +92,8 @@ sh infer.sh
 You can either **load the diffusion model and VAE separately**:
 
 ```bash
-+diffusion_model_path=yslan/worldmem_checkpoints/diffusion_only.ckpt \
-+vae_path=yslan/worldmem_checkpoints/vae_only.ckpt \
++diffusion_model_path=zeqixiao/worldmem_checkpoints/diffusion_only.ckpt \
++vae_path=zeqixiao/worldmem_checkpoints/vae_only.ckpt \
 +customized_load=true \
 +seperate_load=true \
 ```
@@ -105,6 +105,41 @@ Or **load a combined checkpoint**:
 +customized_load=true \
 +seperate_load=false \
 ```
+
+### Evaluation
+
+To run evaluation:
+
+```bash
+sh evaluate.sh
+```
+
+This script reproduces the results in Table 1 (beyond context window). Evaluating 1 case on 1 A100 GPU takes approximately 6 minutes. You can adjust `experiment.test.limit_batch` to specify the number of cases to evaluate.
+
+Visual results will be saved by default to a timestamped directory (e.g., `outputs/2025-11-30/00-02-42`).
+
+To calculate the FID score, run:
+
+```bash
+python calculate_fid.py --videos_dir <path_to_videos>
+```
+
+For example:
+
+```bash
+python calculate_fid.py --videos_dir outputs/2025-11-30/00-02-42/videos/test_vis
+```
+
+**Expected Results:**
+
+| Metric | Value  |
+|--------|--------|
+| PSNR   | 19.34  |
+| LPIPS  | 0.1667 |
+| FID    | 15.13  |
+
+*Note: FID is computed over 5000 frames.*
+*Note: Previous versions incorrectly used `data_range=2.0` for PSNR calculation, but the decoded video data is in the range [0, 1], so `data_range=1.0` should be used. This bug inflated PSNR values by approximately 6 dB. We have now corrected this in the latest version by clipping predictions to [0, 1] before metric computation. The relative performance comparisons and conclusions remain unchanged.*
 
 ---
 
@@ -119,7 +154,21 @@ data/
 └── minecraft/
     ├── training/
     └── validation/
+    └── test/
 ```
+
+## Data Generation
+
+After setting up the environment as described in [MineDojo's GitHub repository](https://github.com/MineDojo/MineDojo), you can generate data using the following command:
+
+```bash
+xvfb-run -a python data_generator.py -o data/test -z 4 --env_type plains
+```
+
+**Parameters:**
+- `-o`: Output directory for generated data
+- `-z`: Number of parallel workers
+- `--env_type`: Environment type (e.g., `plains`, `forest`, `desert`)
 
 
 ## TODO
@@ -127,6 +176,7 @@ data/
 - [x] Release inference models and weights;
 - [x] Release training pipeline on Minecraft;
 - [x] Release training data on Minecraft;
+- [x] Release evaluation scripts and data generator.
 
 
 

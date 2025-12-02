@@ -49,23 +49,14 @@ def load_custom_checkpoint(algo, checkpoint_path):
         checkpoint_path = Path(checkpoint_path)
 
     if is_huggingface_model(str(checkpoint_path)):
-        # Load from Hugging Face Hub if the path contains 'yslan'
+        # Load from Hugging Face Hub if the path contains 'zeqixiao'
         hf_ckpt = str(checkpoint_path).split('/')
         repo_id = '/'.join(hf_ckpt[:2])
         file_name = '/'.join(hf_ckpt[2:])
         model_path = hf_hub_download(repo_id=repo_id, filename=file_name)
         ckpt = torch.load(model_path, map_location=torch.device('cpu'))
 
-        # quick workaround
-        filtered_state_dict = {}
-        for k, v in ckpt['state_dict'].items():
-            if "frame_timestep_embedder" in k:
-                new_k = k.replace("frame_timestep_embedder", "timestamp_embedding")
-                filtered_state_dict[new_k] = v
-            else:
-                filtered_state_dict[k] = v
-
-        algo.load_state_dict(filtered_state_dict, strict=False)
+        algo.load_state_dict(ckpt['state_dict'], strict=True)
 
     elif checkpoint_path.suffix == ".pt":
         # Load from a .pt file
@@ -105,11 +96,6 @@ def load_custom_checkpoint(algo, checkpoint_path):
             k: v for k, v in ckpt['state_dict'].items()
             if not k in ["data_mean", "data_std"]
         }
-
-        # for k, v in filtered_state_dict.items():
-        #     if "frame_timestep_embedder" in k:
-        #         new_k = k.replace("frame_timestep_embedder", "timestamp_embedding")
-        #         filtered_state_dict[new_k] = v
 
         algo.load_state_dict(filtered_state_dict, strict=False)
 
@@ -436,13 +422,37 @@ class BaseLightningExperiment(BaseExperiment):
             detect_anomaly=False,  # self.cfg.debug,
         )
 
-        # Only load the checkpoint if only testing. Otherwise, it will have been loaded
-        # and further trained during train.
-        trainer.test(
-            self.algo,
-            dataloaders=self._build_test_loader(),
-            ckpt_path=self.ckpt_path,
-        )
+        if self.customized_load:
+            if self.seperate_load:
+                if 'oasis500m' in self.diffusion_model_path:
+                    load_custom_checkpoint(algo=self.algo.diffusion_model.model,checkpoint_path=self.diffusion_model_path)
+                else:
+                    load_custom_checkpoint(algo=self.algo.diffusion_model,checkpoint_path=self.diffusion_model_path)
+                load_custom_checkpoint(algo=self.algo.vae,checkpoint_path=self.vae_path)
+            else:
+                load_custom_checkpoint(algo=self.algo,checkpoint_path=self.ckpt_path)
+
+            if self.zero_init_gate:
+                for name, para in self.algo.diffusion_model.named_parameters():
+                    if 'r_adaLN_modulation' in name:
+                        para.requires_grad_(False)
+                        para[2*1024:3*1024] = 0
+                        para[5*1024:6*1024] = 0
+                        para.requires_grad_(True)
+            
+            trainer.test(
+                self.algo,
+                dataloaders=self._build_test_loader(),
+                ckpt_path=None,
+            )
+        else:
+            trainer.test(
+                self.algo,
+                dataloaders=self._build_test_loader(),
+                ckpt_path=self.ckpt_path,
+            )
+
+
         if not self.algo:
             self.algo = self._build_algo()
         if self.cfg.validation.compile:

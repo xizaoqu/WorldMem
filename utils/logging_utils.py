@@ -2,6 +2,7 @@ from typing import Optional
 import wandb
 import numpy as np
 import torch
+import os
 
 import matplotlib.pyplot as plt
 import cv2
@@ -9,7 +10,8 @@ import matplotlib.pyplot as plt
 from tqdm import trange, tqdm
 import matplotlib.animation as animation
 from pathlib import Path
-
+import imageio
+        
 plt.set_loglevel("warning")
 
 from torchmetrics.functional import mean_squared_error, peak_signal_noise_ratio
@@ -34,6 +36,10 @@ def log_video(
     context_frames=0,
     color=(255, 0, 0),
     logger=None,
+    fps=15,
+    format="mp4",
+    save_local=True,
+    local_save_dir=None,
 ):
     """
     take in video tensors in range [-1, 1] and log into wandb
@@ -46,37 +52,139 @@ def log_video(
     :param context_frames: an int indicating how many frames in observation_hat are ground truth given as context
     :param color: a tuple of 3 numbers specifying the color of the border for ground truth frames
     :param logger: optional logger to use. use global wandb if not specified
+    :param fps: frames per second for the video (default: 15)
+    :param format: video format, either "mp4" or "gif" (default: "mp4")
+    :param save_local: whether to save videos to local disk (default: True)
+    :param local_save_dir: directory to save local videos. If None, uses hydra output dir
     """
+    import cv2
+    import hydra
+    from pathlib import Path
+    
+    # Get local rank for distributed training
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    
     if not logger:
         logger = wandb
     
-        # observation_gt = torch.zeros_like(observation_hat)
-    # observation_hat[:context_frames] = observation_gt[:context_frames]
-    # Add red border of 1 pixel width to the context frames
-    # for i, c in enumerate(color):
-    #     c = c / 255.0
-    #     observation_hat[:context_frames, :, i, [0, -1], :] = c
-    #     observation_hat[:context_frames, :, i, :, [0, -1]] = c
-
-    #     if observation_gt is not None:
-    #         observation_gt[:context_frames, :, i, [0, -1], :] = c
-    #         observation_gt[:context_frames, :, i, :, [0, -1]] = c
-    
+    # Prepare video tensors
+    observation_hat_np = observation_hat.detach().cpu().numpy()
     if observation_gt is not None:
-        video = torch.cat([observation_hat, observation_gt], -2).detach().cpu().numpy()
+        observation_gt_np = observation_gt.detach().cpu().numpy()
     else:
-        video = torch.cat([observation_hat], -1).detach().cpu().numpy()
-    video = np.transpose(np.clip(video, a_min=0.0, a_max=1.0) * 255, (1, 0, 2, 3, 4)).astype(np.uint8)
-    # video[..., 1:] = video[..., :1]  # remove framestack, only visualize current frame
-    n_samples = len(video)
-    # use wandb directly here since pytorch lightning doesn't support logging videos yet
+        observation_gt_np = None
+    
+    # Normalize to 0-255
+    observation_hat_np = np.transpose(np.clip(observation_hat_np, a_min=0.0, a_max=1.0) * 255, (1, 0, 2, 3, 4)).astype(np.uint8)
+    if observation_gt_np is not None:
+        observation_gt_np = np.transpose(np.clip(observation_gt_np, a_min=0.0, a_max=1.0) * 255, (1, 0, 2, 3, 4)).astype(np.uint8)
+    
+    n_samples = len(observation_hat_np)
+    
+    # Setup local save directory
+    if save_local:
+        if local_save_dir is None:
+            try:
+                hydra_cfg = hydra.core.hydra_config.HydraConfig.get()
+                output_dir = Path(hydra_cfg.runtime.output_dir)
+            except:
+                output_dir = Path.cwd() / "outputs"
+            local_save_dir = output_dir / "videos" / namespace
+        else:
+            local_save_dir = Path(local_save_dir)
+        
+        local_save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save pred videos locally
+        pred_dir = local_save_dir / "pred"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save gt videos locally if available
+        if observation_gt_np is not None:
+            gt_dir = local_save_dir / "gt"
+            gt_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save videos
     for i in range(n_samples):
-        logger.log(
-            {
-                f"{namespace}/{prefix}_{i}": wandb.Video(video[i], fps=5),
-                f"trainer/global_step": step,
-            }
-        )
+        video_pred = observation_hat_np[i]  # (T, C, H, W)
+        
+        if save_local:
+            # Save prediction video
+            if step is not None:
+                video_filename_pred = f"{prefix}_{i}_rank{local_rank}_step{step}.{format}"
+            else:
+                video_filename_pred = f"{prefix}_{i}_rank{local_rank}.{format}"
+            
+            video_path_pred = pred_dir / video_filename_pred
+            _save_video_to_file(video_pred, str(video_path_pred), fps)
+            
+            # Save ground truth video if available
+            if observation_gt_np is not None:
+                video_gt = observation_gt_np[i]
+                if step is not None:
+                    video_filename_gt = f"{prefix}_{i}_rank{local_rank}_step{step}.{format}"
+                else:
+                    video_filename_gt = f"{prefix}_{i}_rank{local_rank}.{format}"
+                
+                video_path_gt = gt_dir / video_filename_gt
+                _save_video_to_file(video_gt, str(video_path_gt), fps)
+        
+        # Log to wandb (only rank 0 to avoid duplicate logging)
+        if local_rank == 0 and logger:
+            # Concatenate pred and gt side by side for visualization
+            if observation_gt_np is not None:
+                video_combined = torch.cat([
+                    torch.from_numpy(observation_hat_np),
+                    torch.from_numpy(observation_gt_np)
+                ], -2).numpy()  # Concatenate along width
+                logger.log(
+                    {
+                        f"{namespace}/{prefix}_{i}": wandb.Video(video_combined[i], fps=fps, format=format),
+                        f"trainer/global_step": step,
+                    }
+                )
+            else:
+                logger.log(
+                    {
+                        f"{namespace}/{prefix}_{i}": wandb.Video(video_pred, fps=fps, format=format),
+                        f"trainer/global_step": step,
+                    }
+                )
+
+
+def _save_video_to_file(video_tensor, output_path, fps=15):
+    """
+    Save a video tensor to file using imageio (better compatibility than cv2).
+    
+    :param video_tensor: numpy array of shape (T, C, H, W) with values in [0, 255]
+    :param output_path: path to save the video
+    :param fps: frames per second
+    """
+
+    T, C, H, W = video_tensor.shape
+    
+    # Convert from (T, C, H, W) to (T, H, W, C)
+    video_tensor = np.transpose(video_tensor, (0, 2, 3, 1))
+    
+    # Ensure uint8
+    video_tensor = video_tensor.astype(np.uint8)
+    
+    # Save using imageio with H.264 codec (best compatibility)
+    writer = imageio.get_writer(
+        output_path, 
+        fps=fps,
+        codec='libx264',  # H.264 codec - widely supported
+        quality=8,  # Good quality (scale 0-10, 10 is best)
+        pixelformat='yuv420p',  # Standard pixel format for compatibility
+        macro_block_size=1  # Better quality
+    )
+    
+    for frame in video_tensor:
+        writer.append_data(frame)
+    
+    writer.close()
+        
+
 
 
 def get_validation_metrics_for_videos(
@@ -85,6 +193,7 @@ def get_validation_metrics_for_videos(
     lpips_model: Optional[LearnedPerceptualImagePatchSimilarity] = None,
     fid_model: Optional[FrechetInceptionDistance] = None,
     fvd_model: Optional[FrechetVideoDistance] = None,
+    lpips_batch_size: int = 100,
 ):
     """
     :param observation_hat: predicted observation tensor of shape (frame, batch, channel, height, width)
@@ -92,6 +201,7 @@ def get_validation_metrics_for_videos(
     :param lpips_model: a LearnedPerceptualImagePatchSimilarity object from algorithm.common.metrics
     :param fid_model: a FrechetInceptionDistance object  from algorithm.common.metrics
     :param fvd_model: a FrechetVideoDistance object  from algorithm.common.metrics
+    :param lpips_batch_size: batch size for LPIPS calculation to avoid OOM (default: 100)
     :return: a tuple of metrics
     """
     frame, batch, channel, height, width = observation_hat.shape
@@ -104,39 +214,51 @@ def get_validation_metrics_for_videos(
     observation_hat = observation_hat.float()
     observation_gt = observation_gt.float()
 
-    # observation_hat = observation_hat.float().to(next(lpips_model.parameters()).device)
-    # observation_gt = observation_gt.float().to(next(lpips_model.parameters()).device)
-    # if fvd_model is not None:
-    #     output_dict["fvd"] = fvd_model.compute(torch.clamp(observation_hat, -1.0, 1.0), torch.clamp(observation_gt, -1.0, 1.0))
+    # Clip to [0, 1] range before computing metrics (matching video saving behavior)
+    observation_hat_clipped = torch.clamp(observation_hat, 0.0, 1.0)
+    observation_gt_clipped = torch.clamp(observation_gt, 0.0, 1.0)
 
+    # Compute frame-wise PSNR
     frame_wise_psnr = []
-    for f in range(observation_hat.shape[0]):
-        frame_wise_psnr.append(peak_signal_noise_ratio(observation_hat[f], observation_gt[f], data_range=2.0))
+    for f in range(observation_hat_clipped.shape[0]):
+        frame_wise_psnr.append(peak_signal_noise_ratio(observation_hat_clipped[f], observation_gt_clipped[f], data_range=1.0))
     frame_wise_psnr = torch.stack(frame_wise_psnr)
 
     output_dict["frame_wise_psnr"] = frame_wise_psnr
-    observation_hat = observation_hat.view(-1, channel, height, width)
-    observation_gt = observation_gt.view(-1, channel, height, width)
+    observation_hat_clipped = observation_hat_clipped.view(-1, channel, height, width)
+    observation_gt_clipped = observation_gt_clipped.view(-1, channel, height, width)
 
-    output_dict["mse"] = mean_squared_error(observation_hat, observation_gt)
+    # Compute MSE and PSNR on clipped data
+    output_dict["mse"] = mean_squared_error(observation_hat_clipped, observation_gt_clipped)
+    output_dict["psnr"] = peak_signal_noise_ratio(observation_hat_clipped, observation_gt_clipped, data_range=1.0)
+    # output_dict["ssim"] = structural_similarity_index_measure(observation_hat_clipped, observation_gt_clipped, data_range=1.0)
+    # output_dict["uiqi"] = universal_image_quality_index(observation_hat_clipped, observation_gt_clipped)
 
-    output_dict["psnr"] = peak_signal_noise_ratio(observation_hat, observation_gt, data_range=2.0)
-    # output_dict["ssim"] = structural_similarity_index_measure(observation_hat, observation_gt, data_range=2.0)
-    # output_dict["uiqi"] = universal_image_quality_index(observation_hat, observation_gt)
-    # operations for LPIPS and FID
-    observation_hat = torch.clamp(observation_hat, -1.0, 1.0)
-    observation_gt = torch.clamp(observation_gt, -1.0, 1.0)
-
+    # LPIPS computation
     if lpips_model is not None:
-        lpips_model.update(observation_hat, observation_gt)
+        # Process LPIPS in batches to avoid OOM
+        num_frames = observation_hat_clipped.shape[0]
+        
+        for i in range(0, num_frames, lpips_batch_size):
+            batch_end = min(i + lpips_batch_size, num_frames)
+            observation_hat_batch = observation_hat_clipped[i:batch_end]
+            observation_gt_batch = observation_gt_clipped[i:batch_end]
+            
+            lpips_model.update(observation_hat_batch, observation_gt_batch)
+            
+            # Free GPU memory after each batch
+            del observation_hat_batch, observation_gt_batch
+            torch.cuda.empty_cache()
+        
         lpips = lpips_model.compute().item()
         # Reset the states of non-functional metrics
         output_dict["lpips"] = lpips
         lpips_model.reset()
 
+    # FID computation
     if fid_model is not None:
-        observation_hat_uint8 = ((observation_hat + 1.0) / 2 * 255).type(torch.uint8)
-        observation_gt_uint8 = ((observation_gt + 1.0) / 2 * 255).type(torch.uint8)
+        observation_hat_uint8 = (observation_hat_clipped * 255).type(torch.uint8)
+        observation_gt_uint8 = (observation_gt_clipped * 255).type(torch.uint8)
         fid_model.update(observation_gt_uint8, real=True)
         fid_model.update(observation_hat_uint8, real=False)
         fid = fid_model.compute()

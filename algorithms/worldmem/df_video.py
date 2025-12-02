@@ -341,16 +341,18 @@ class WorldMemMinecraft(DiffusionForcingBase):
         self.memory_condition_length = cfg.memory_condition_length
         self.pose_cond_dim = getattr(cfg, "pose_cond_dim", 5)
 
-        self.use_plucker = cfg.use_plucker
-        self.relative_embedding = cfg.relative_embedding
+        self.use_plucker = getattr(cfg, "use_plucker", True)
+        self.relative_embedding = getattr(cfg, "relative_embedding", True)
         self.state_embed_only_on_qk = getattr(cfg, "state_embed_only_on_qk", True)
         self.use_memory_attention = getattr(cfg, "use_memory_attention", True)
-        self.add_timestamp_embedding = cfg.add_timestamp_embedding
+        self.add_timestamp_embedding = getattr(cfg, "add_timestamp_embedding", True)
         self.ref_mode = getattr(cfg, "ref_mode", 'sequential')
         self.log_curve = getattr(cfg, "log_curve", False)
         self.focal_length =  getattr(cfg, "focal_length", 0.35)
         self.log_video = cfg.log_video
-        self.self_consistency_eval = getattr(cfg, "self_consistency_eval", False)
+        self.save_local = getattr(cfg, "save_local", True)
+        self.local_save_dir = getattr(cfg, "local_save_dir", None)
+        self.lpips_batch_size = getattr(cfg, "lpips_batch_size", 16)
         self.next_frame_length = getattr(cfg, "next_frame_length", 1)
         self.require_pose_prediction = getattr(cfg, "require_pose_prediction", False)
 
@@ -497,12 +499,20 @@ class WorldMemMinecraft(DiffusionForcingBase):
                 namespace=namespace + "_vis",
                 context_frames=self.context_frames,
                 logger=self.logger.experiment,
+                save_local=self.save_local,
+                local_save_dir=self.local_save_dir,
             )
 
         if xs is not None:
+            # Move data to the same device as LPIPS model for metric calculation
+            device = next(self.validation_lpips_model.parameters()).device
+            xs_pred_device = xs_pred.to(device)
+            xs_device = xs.to(device)
+            
             metric_dict = get_validation_metrics_for_videos(
-                xs_pred, xs, 
-                lpips_model=self.validation_lpips_model)
+                xs_pred_device, xs_device, 
+                lpips_model=self.validation_lpips_model,
+                lpips_batch_size=self.lpips_batch_size)
             
             self.log_dict(
                 {"mse": metric_dict['mse'],
@@ -524,19 +534,6 @@ class WorldMemMinecraft(DiffusionForcingBase):
 
                 self.logger.experiment.log({"frame_wise_psnr_plot": line_plot})
       
-        elif self.self_consistency_eval:
-            metric_dict = get_validation_metrics_for_videos(
-                xs_pred[:1],
-                xs_pred[-1:],
-                lpips_model=self.validation_lpips_model,
-            )            
-            self.log_dict(
-                {"lpips": metric_dict['lpips'],
-                "mse": metric_dict['mse'],
-                "psnr": metric_dict['psnr']},
-                sync_dist=True
-            )
-
         self.validation_step_outputs.clear()
 
     def _preprocess_batch(self, batch):
@@ -786,8 +783,8 @@ class WorldMemMinecraft(DiffusionForcingBase):
         xs_pred = self.decode(xs_pred[n_context_frames:].to(conditions.device))
         xs_decode = self.decode(xs[n_context_frames:].to(conditions.device))
 
-        # Store results for evaluation
-        self.validation_step_outputs.append((xs_pred, xs_decode))
+        # Store results for evaluation (move to CPU to save GPU memory)
+        self.validation_step_outputs.append((xs_pred.detach().cpu(), xs_decode.detach().cpu()))
         return
 
     @torch.no_grad()

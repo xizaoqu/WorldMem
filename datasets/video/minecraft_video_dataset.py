@@ -66,22 +66,19 @@ class MinecraftVideoDataset(BaseVideoDataset):
         split (str): Dataset split ("training" or "validation").
     """
     def __init__(self, cfg: DictConfig, split: str = "training"):
-        if split == "test":
-            split = "validation"
         self.wo_updown = getattr(cfg, "wo_updown", False)
         super().__init__(cfg, split)
-        self.n_frames = cfg.n_frames_valid if split == "validation" and hasattr(cfg, "n_frames_valid") else cfg.n_frames
-        self.memory_condition_length = cfg.memory_condition_length
+        self.n_frames = cfg.n_frames_valid if split == "validation" or split == "test" and hasattr(cfg, "n_frames_valid") else cfg.n_frames
+        self.memory_condition_length = getattr(cfg, "memory_condition_length", 8)
         self.customized_validation = cfg.customized_validation
         if split == "training":
             self.angle_range = cfg.angle_range
             self.pos_range = cfg.pos_range
-        self.add_timestamp_embedding = cfg.add_timestamp_embedding
+        self.add_timestamp_embedding = getattr(cfg, "add_timestamp_embedding", True)
         self.training_dropout = 0.1
-        self.memory_condition_length = getattr(cfg, "memory_condition_length", False)
         self.sample_more_event = getattr(cfg, "sample_more_event", False)
         self.causal_frame = getattr(cfg, "causal_frame", False)
-
+        
     def get_data_paths(self, split: str):
         """
         Retrieve all video file paths for the given split.
@@ -99,9 +96,9 @@ class MinecraftVideoDataset(BaseVideoDataset):
             # Filter out paths containing "w_updown"
             paths = [p for p in paths if "w_updown" not in str(p)]
         
-        if split == "validation" and self.wo_updown:
+        if (split == "validation" or split == "test") and self.wo_updown:
             paths = [p for p in paths if "w_updown" not in str(p)]
-        elif split == "validation":
+        elif split == "validation" or split == "test":
             paths = [p for p in paths if "w_updown" in str(p)]
 
         if not paths:
@@ -129,7 +126,7 @@ class MinecraftVideoDataset(BaseVideoDataset):
             try:
                 return self.load_data(idx)
             except Exception as e:
-                print(f"Retrying due to error: {e}")
+                # print(f"Retrying due to error: {e}")
                 idx = (idx + 1) % len(self)
 
     def load_data(self, idx):
@@ -147,7 +144,8 @@ class MinecraftVideoDataset(BaseVideoDataset):
 
         # Fix corrupted height (maybe) in the first frame
         poses_pool[0, 1] = poses_pool[1, 1]
-        assert poses_pool[:, 1].ptp() < 2, f"Height variation too large: {poses_pool[:, 1].ptp()} - {video_path}"
+        # assert poses_pool[:, 1].ptp() < 2, f"Height variation too large: {poses_pool[:, 1].ptp()} - {video_path}"
+        assert poses_pool[:, 1].ptp() < 2
 
         # Pad poses if shorter than actions
         if len(poses_pool) < len(actions_pool):

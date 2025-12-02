@@ -194,7 +194,7 @@ class DiffusionForcingBase(BasePytorchAlgo):
     def test_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         return self.validation_step(*args, **kwargs, namespace="test")
 
-    def test_epoch_end(self) -> None:
+    def on_test_epoch_end(self) -> None:
         self.on_validation_epoch_end(namespace="test")
 
     def _generate_noise_levels(self, xs: torch.Tensor, masks: Optional[torch.Tensor] = None) -> torch.Tensor:

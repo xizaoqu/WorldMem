@@ -35,9 +35,4 @@ diffusion:
     use_linear_attn: True
     time_emb_type: rotary
 
-metrics:
-  # - fvd
-  # - fid
-  # - lpips
-
 _name: df_video_worldmemminecraft

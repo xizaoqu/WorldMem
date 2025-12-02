@@ -169,7 +169,7 @@ xvfb-run -a python data_generator.py -o data/test -z 4 --env_type plains
 **Parameters:**
 - `-o`: Output directory for generated data
 - `-z`: Number of parallel workers
-- `--env_type`: Environment type (e.g., `plains`, `forest`, `desert`)
+- `--env_type`: Environment type (e.g., `plains`)
 
 
 ## TODO

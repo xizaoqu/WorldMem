@@ -114,7 +114,7 @@ To run evaluation:
 sh evaluate.sh
 ```
 
-This script reproduces the results in Table 1 (beyond context window). Evaluating 1 case on 1 A100 GPU takes approximately 6 minutes. You can adjust `experiment.test.limit_batch` to specify the number of cases to evaluate.
+This script reproduces the results in Table 1 (beyond context window). It will generate PSNR and Lpips. Evaluating 1 case on 1 A100 GPU takes approximately 6 minutes. You can adjust `experiment.test.limit_batch` to specify the number of cases to evaluate. 
 
 Visual results will be saved by default to a timestamped directory (e.g., `outputs/2025-11-30/00-02-42`).
 

@@ -33,6 +33,11 @@ def run_local(cfg: DictConfig):
     # delay some imports in case they are not needed in non-local envs for submission
     from experiments import build_experiment
     from utils.wandb_utils import OfflineWandbLogger, SpaceEfficientWandbLogger
+    import lightning.pytorch as pl
+
+    # Set global seed for reproducibility
+    if cfg.get("seed", None) is not None:
+        pl.seed_everything(cfg.seed, workers=True)
 
     # Get yaml names
     hydra_cfg = hydra.core.hydra_config.HydraConfig.get()

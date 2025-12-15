@@ -51,7 +51,9 @@ class BaseVideoDataset(torch.utils.data.Dataset, ABC):
         self.transform = transforms.Resize((self.resolution, self.resolution), antialias=True)
 
         # shuffle but keep the same order for each epoch, so validation sample is diverse yet deterministic
-        random.seed(0)
+        # Use seed from config if provided, otherwise default to 0
+        shuffle_seed = cfg.get("seed", 0)
+        random.seed(shuffle_seed)
         self.idx_remap = list(range(self.__len__()))
         random.shuffle(self.idx_remap)
         

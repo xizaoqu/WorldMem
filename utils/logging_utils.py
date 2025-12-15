@@ -218,19 +218,22 @@ def get_validation_metrics_for_videos(
     observation_hat_clipped = torch.clamp(observation_hat, 0.0, 1.0)
     observation_gt_clipped = torch.clamp(observation_gt, 0.0, 1.0)
 
-    # Compute frame-wise PSNR
-    frame_wise_psnr = []
-    for f in range(observation_hat_clipped.shape[0]):
-        frame_wise_psnr.append(peak_signal_noise_ratio(observation_hat_clipped[f], observation_gt_clipped[f], data_range=1.0))
-    frame_wise_psnr = torch.stack(frame_wise_psnr)
-
-    output_dict["frame_wise_psnr"] = frame_wise_psnr
+    # Compute video-wise PSNR: frame-wise average per video, then average across videos
+    video_psnr_list = []
+    for b in range(batch):
+        frame_psnr_for_video = []
+        for f in range(frame):
+            frame_psnr = peak_signal_noise_ratio(observation_hat_clipped[f, b], observation_gt_clipped[f, b], data_range=1.0)
+            frame_psnr_for_video.append(frame_psnr)
+        video_psnr = torch.stack(frame_psnr_for_video).mean()
+        video_psnr_list.append(video_psnr)
+    output_dict["psnr"] = torch.stack(video_psnr_list).mean()
+    
     observation_hat_clipped = observation_hat_clipped.view(-1, channel, height, width)
     observation_gt_clipped = observation_gt_clipped.view(-1, channel, height, width)
 
-    # Compute MSE and PSNR on clipped data
+    # Compute MSE on clipped data
     output_dict["mse"] = mean_squared_error(observation_hat_clipped, observation_gt_clipped)
-    output_dict["psnr"] = peak_signal_noise_ratio(observation_hat_clipped, observation_gt_clipped, data_range=1.0)
     # output_dict["ssim"] = structural_similarity_index_measure(observation_hat_clipped, observation_gt_clipped, data_range=1.0)
     # output_dict["uiqi"] = universal_image_quality_index(observation_hat_clipped, observation_gt_clipped)
 

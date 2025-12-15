@@ -3,6 +3,7 @@ wandb offline
 python -m main +name=infer \
     experiment.tasks=[test] \
     dataset.validation_multiplier=1 \
+    +dataset.seed=42 \
     +diffusion_model_path=zeqixiao/worldmem_checkpoints/diffusion_only.ckpt \
     +vae_path=zeqixiao/worldmem_checkpoints/vae_only.ckpt \
     +customized_load=true \

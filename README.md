@@ -184,14 +184,10 @@ xvfb-run -a python data_generator.py -o data/test -z 4 --env_type plains
 If you find our work helpful, please cite:
 
 ```
-@misc{xiao2025worldmemlongtermconsistentworld,
-      title={WORLDMEM: Long-term Consistent World Simulation with Memory}, 
-      author={Zeqi Xiao and Yushi Lan and Yifan Zhou and Wenqi Ouyang and Shuai Yang and Yanhong Zeng and Xingang Pan},
-      year={2025},
-      eprint={2504.12369},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2504.12369}, 
+@inproceedings{xiaoworldmem,
+  title={WorldMem: Long-term Consistent World Simulation with Memory},
+  author={Xiao, Zeqi and Yushi, LAN and Zhou, Yifan and Ouyang, Wenqi and Yang, Shuai and Zeng, Yanhong and Pan, Xingang},
+  booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems}
 }
 ```
 
